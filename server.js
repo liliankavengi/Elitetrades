@@ -410,7 +410,142 @@ app.get('/api/check-deposit-status', async (req, res) => {
   }
 });
 
-/* ─── 3. Initiate Withdrawal ─────────────────────────────── */
+const creditedTransactions = new Set();
+
+/* ─── 4. Sync Recent Deposits (Last 30 - 45 Minutes) ────── */
+app.get('/api/sync-recent-deposits', async (req, res) => {
+  try {
+    const { uid, phone, window } = req.query;
+    const now = Date.now();
+    const windowMinutes = parseInt(window) || 45; // Default 45 mins to safely cover 30 mins
+    const windowMs = windowMinutes * 60 * 1000;
+
+    const phRes = await fetch('https://backend.payhero.co.ke/api/v2/transactions', {
+      headers: { 'Authorization': payheroAuth() },
+    });
+
+    if (!phRes.ok) {
+      return res.status(500).json({ success: false, error: 'Could not fetch PayHero transactions' });
+    }
+
+    const phData = await phRes.json();
+    const allTxs = phData.transactions || [];
+
+    // Filter inbound payments in the time window
+    const recentInbound = allTxs.filter(t => {
+      if (t.transaction_type !== 'inbound_payment') return false;
+      const tTime = new Date(t.created_at).getTime();
+      return (now - tTime) <= windowMs;
+    });
+
+    const cleanUserPhone = (phone || '').replace(/\D/g, '').slice(-9);
+    const userUidPrefix = (uid || '').slice(0, 8);
+
+    const matchedDeposits = [];
+
+    for (const tx of recentInbound) {
+      const txPhone = (tx.beneficiary_number || tx.phone || '').replace(/\D/g, '').slice(-9);
+      const extRef = tx.external_reference || '';
+
+      // Match if extRef matches UID prefix, or phone matches, or if only 1 recent deposit in channel, or if no filter
+      const matchesUid = userUidPrefix && extRef.includes(userUidPrefix);
+      const matchesPhone = cleanUserPhone && txPhone && cleanUserPhone === txPhone;
+      const isCandidate = matchesUid || matchesPhone || (!cleanUserPhone && !userUidPrefix) || (!matchesUid && !matchesPhone && recentInbound.length === 1);
+
+      if (isCandidate) {
+        const amount_kes = Number(tx.amount || 0);
+        const amount_usd = kesToUsd(amount_kes);
+        const targetUid = uid || (extRef.split('-')[2] ? 'usr_' + extRef.split('-')[2] : 'current_user');
+        const txKey = (tx.provider_reference || extRef || String(tx.id)).trim();
+
+        // Update in-memory deposit state
+        inMemoryDeposits.set(extRef || txKey, {
+          uid: targetUid,
+          amount_kes,
+          amount_usd,
+          phone: tx.beneficiary_number || tx.phone,
+          status: 'completed',
+          mpesaReceipt: tx.provider_reference,
+          completedAt: new Date(tx.created_at).getTime(),
+        });
+
+        // Idempotent balance credit
+        const alreadyCredited = creditedTransactions.has(txKey);
+        if (!alreadyCredited) {
+          creditedTransactions.add(txKey);
+          const curBal = inMemoryUsers.get(targetUid) || 0;
+          const newBal = parseFloat((curBal + amount_usd).toFixed(2));
+          inMemoryUsers.set(targetUid, newBal);
+        }
+
+        // Update Firestore if available
+        try {
+          const userRef = db.collection('users').doc(targetUid);
+          await db.runTransaction(async (txDb) => {
+            const userDoc = await txDb.get(userRef);
+            const dbBal = userDoc.exists ? (userDoc.data().balance || 0) : 0;
+            const dbTx = userDoc.exists ? (userDoc.data().transactions || []) : [];
+            const alreadyLogged = dbTx.some(x => (extRef && x.reference === extRef) || (tx.provider_reference && x.mpesaReceipt === tx.provider_reference) || (tx.id && x.payheroId === tx.id));
+            if (!alreadyLogged) {
+              const updatedBal = parseFloat((dbBal + amount_usd).toFixed(2));
+              txDb.set(userRef, {
+                balance: updatedBal,
+                transactions: [
+                  ...dbTx,
+                  {
+                    type: 'deposit',
+                    amount: amount_usd,
+                    amount_kes,
+                    method: 'M-Pesa',
+                    reference: extRef,
+                    mpesaReceipt: tx.provider_reference,
+                    payheroId: tx.id,
+                    phone: tx.beneficiary_number,
+                    ts: new Date(tx.created_at).getTime(),
+                  }
+                ].slice(-200)
+              }, { merge: true });
+            }
+          });
+
+          if (extRef) {
+            await db.collection('pending_deposits').doc(extRef).set({
+              uid: targetUid,
+              amount_kes,
+              amount_usd,
+              status: 'completed',
+              mpesaReceipt: tx.provider_reference,
+              completed_at: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+          }
+        } catch (_) {}
+
+        matchedDeposits.push({
+          id: tx.id,
+          amount_kes,
+          amount_usd,
+          mpesaReceipt: tx.provider_reference,
+          reference: extRef,
+          phone: tx.beneficiary_number,
+          createdAt: tx.created_at,
+          alreadyCredited,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      count: matchedDeposits.length,
+      deposits: matchedDeposits,
+      total_credited_usd: matchedDeposits.reduce((acc, d) => acc + d.amount_usd, 0),
+    });
+  } catch (err) {
+    console.error('syncRecentDeposits error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ─── 5. Initiate Withdrawal ─────────────────────────────── */
 app.post('/api/initiate-withdrawal', async (req, res) => {
   try {
     let { amount_usd, phone, uid } = req.body;

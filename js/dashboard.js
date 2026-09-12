@@ -30,6 +30,16 @@
     transactions: [],
   };
 
+  // Hydrate from localStorage cache
+  try {
+    const cachedState = localStorage.getItem('et_state_cache');
+    if (cachedState) {
+      const parsed = JSON.parse(cachedState);
+      if (typeof parsed.balance === 'number') state.balance = parsed.balance;
+      if (Array.isArray(parsed.transactions)) state.transactions = parsed.transactions;
+    }
+  } catch (_) {}
+
   let firestoreUid = null;
 
   function getUid() {
@@ -1139,7 +1149,10 @@
   function openModal(modal) { modal?.classList.add('show'); }
   function closeModal(modal) { modal?.classList.remove('show'); }
 
-  depositBtn.forEach(b => b.addEventListener('click', () => openModal(depositModal)));
+  depositBtn.forEach(b => b.addEventListener('click', () => {
+    openModal(depositModal);
+    if (typeof syncRecentPayments === 'function') syncRecentPayments(false);
+  }));
   withdrawBtn.forEach(b => b.addEventListener('click', () => openModal(withdrawModal)));
 
   document.querySelectorAll('[data-close-modal]').forEach(btn => {
@@ -1425,6 +1438,127 @@
     document.getElementById('mpesaDepositForm').style.display  = '';
     const btn = document.getElementById('mpesaDepositBtn');
     if (btn) { btn.textContent = 'Send M-Pesa Prompt'; btn.disabled = false; }
+  });
+
+  // Phone prefill & autosave
+  const mpesaPhoneInput = document.getElementById('mpesaPhone');
+  if (mpesaPhoneInput) {
+    const savedPhone = localStorage.getItem('et_mpesa_phone');
+    if (savedPhone && !mpesaPhoneInput.value) {
+      mpesaPhoneInput.value = savedPhone;
+    }
+    mpesaPhoneInput.addEventListener('input', (e) => {
+      const v = e.target.value.trim();
+      if (v) {
+        try { localStorage.setItem('et_mpesa_phone', v); } catch (_) {}
+      }
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     11e. AUTO-SYNC RECENT PAYMENTS (Last 30 - 45 Minutes)
+  ═══════════════════════════════════════════════════════════ */
+  let isSyncingDeposits = false;
+  async function syncRecentPayments(showFeedback = false) {
+    if (isSyncingDeposits) return;
+    isSyncingDeposits = true;
+
+    const syncBtn = document.getElementById('btnSyncRecentPayments');
+    if (syncBtn && showFeedback) {
+      syncBtn.disabled = true;
+      syncBtn.innerHTML = '<i data-lucide="loader-2" class="lucide-xs spin"></i> <span>Checking payments…</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      const activeUid = getUid();
+      const savedPhone = localStorage.getItem('et_mpesa_phone') || document.getElementById('mpesaPhone')?.value?.trim() || '';
+      const params = new URLSearchParams();
+      if (activeUid) params.append('uid', activeUid);
+      if (savedPhone) params.append('phone', savedPhone);
+      params.append('window', '45'); // Check last 45 minutes to safely cover all payments in the last 30 minutes
+
+      const res = await fetch(`/api/sync-recent-deposits?${params.toString()}`);
+      if (!res.ok) {
+        if (showFeedback) showToast('Could not sync payments at this time.', 'info');
+        return;
+      }
+
+      const data = await res.json();
+      if (!data || !data.success || !Array.isArray(data.deposits) || data.deposits.length === 0) {
+        if (showFeedback) showToast('No new M-Pesa payments found in the last 30 minutes.', 'info');
+        return;
+      }
+
+      let newlyCreditedUsd = 0;
+      let newDepositsCount = 0;
+
+      for (const dep of data.deposits) {
+        const depRef = dep.reference || '';
+        const depReceipt = dep.mpesaReceipt || '';
+        const depId = dep.id;
+
+        // Check if already present in state.transactions
+        const exists = state.transactions.some(t =>
+          (depRef && t.reference === depRef) ||
+          (depReceipt && t.mpesaReceipt === depReceipt) ||
+          (depId && t.payheroId === depId)
+        );
+
+        if (!exists) {
+          const usd = Number(dep.amount_usd) || 1.0;
+          const kes = Number(dep.amount_kes) || 130;
+          newlyCreditedUsd += usd;
+          newDepositsCount++;
+
+          state.transactions.unshift({
+            type: 'deposit',
+            amount: usd,
+            amount_kes: kes,
+            method: 'M-Pesa',
+            reference: depRef,
+            mpesaReceipt: depReceipt,
+            payheroId: depId,
+            phone: dep.phone,
+            ts: dep.createdAt ? new Date(dep.createdAt).getTime() : Date.now(),
+          });
+        }
+      }
+
+      if (newlyCreditedUsd > 0) {
+        state.balance = parseFloat((state.balance + newlyCreditedUsd).toFixed(2));
+        saveState(state);
+        updateBalanceUI('win');
+        closeModal(depositModal);
+        showToast(`Payment received! +$${newlyCreditedUsd.toFixed(2)} (${newDepositsCount} deposit) credited to your balance.`, 'success');
+      } else if (showFeedback) {
+        // If already credited in transactions, verify state.balance isn't 0
+        const totalDeposited = state.transactions
+          .filter(t => t.type === 'deposit')
+          .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        if (state.balance === 0 && totalDeposited > 0 && state.transactions.filter(t => t.type === 'trade').length === 0) {
+          state.balance = parseFloat(totalDeposited.toFixed(2));
+          saveState(state);
+          updateBalanceUI('win');
+        }
+        showToast('Your recent payment is already credited to your balance.', 'info');
+      }
+    } catch (err) {
+      console.warn('syncRecentPayments error:', err);
+      if (showFeedback) showToast('Sync error: ' + err.message, 'error');
+    } finally {
+      isSyncingDeposits = false;
+      if (syncBtn && showFeedback) {
+        syncBtn.disabled = false;
+        syncBtn.innerHTML = '<i data-lucide="refresh-cw" class="lucide-xs"></i> <span>Check for Recent Payment (Last 30 Min)</span>';
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+
+  // Hook button click
+  document.getElementById('btnSyncRecentPayments')?.addEventListener('click', () => {
+    syncRecentPayments(true);
   });
 
   /* ═══════════════════════════════════════════════════════════
@@ -1713,11 +1847,21 @@
   updateBalanceUI();
   if (window.lucide) lucide.createIcons();
 
-  // Show onboarding toast if balance is 0
-  if (state.balance === 0) {
+  // Auto-sync any payment made in the last 30 minutes on startup
+  setTimeout(() => {
+    syncRecentPayments(false);
+  }, 1200);
+
+  // Background sync every 25 seconds
+  setInterval(() => {
+    syncRecentPayments(false);
+  }, 25000);
+
+  // Show onboarding toast if balance is 0 and no deposits
+  if (state.balance === 0 && state.transactions.length === 0) {
     setTimeout(() => {
       showToast('Welcome! Make your first deposit to start trading.', 'info');
-    }, 1000);
+    }, 1500);
   }
 
 })();
