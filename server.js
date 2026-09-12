@@ -61,6 +61,10 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static frontend files
 app.use(express.static(path.join(__dirname)));
 
+// In-memory cache for fast tracking and fallback
+const inMemoryDeposits = new Map();
+const inMemoryUsers    = new Map();
+
 /* ─── Health Check ───────────────────────────────────────── */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'EliteTrades API', time: new Date().toISOString() });
@@ -91,13 +95,25 @@ app.post('/api/initiate-deposit', async (req, res) => {
     if (normPhone.startsWith('254'))  normPhone = '0' + normPhone.slice(3);
 
     const extRef = `ET-DEP-${uid.slice(0, 8)}-${Date.now()}`;
+    const amount_usd = kesToUsd(amount_kes);
+
+    // Track in-memory immediately
+    inMemoryDeposits.set(extRef, {
+      uid,
+      amount_kes: Number(amount_kes),
+      amount_usd,
+      phone: normPhone,
+      method: 'M-Pesa',
+      status: 'pending',
+      createdAt: Date.now(),
+    });
 
     // Store pending deposit in Firestore
     try {
       await db.collection('pending_deposits').doc(extRef).set({
         uid,
         amount_kes: Number(amount_kes),
-        amount_usd: kesToUsd(amount_kes),
+        amount_usd,
         phone: normPhone,
         method: 'M-Pesa',
         status: 'pending',
@@ -135,6 +151,7 @@ app.post('/api/initiate-deposit', async (req, res) => {
 
     if (!payheroRes.success) {
       const msg = payheroRes.message || 'PayHero rejected the request.';
+      inMemoryDeposits.set(extRef, { ...inMemoryDeposits.get(extRef), status: 'error', error: msg });
       try {
         await db.collection('pending_deposits').doc(extRef).update({ status: 'error', error: msg });
       } catch (_) {}
@@ -148,7 +165,7 @@ app.post('/api/initiate-deposit', async (req, res) => {
       reference: extRef,
       status: payheroRes.status,
       amount_kes,
-      amount_usd: kesToUsd(amount_kes),
+      amount_usd,
     });
   } catch (err) {
     console.error('initiateDeposit error:', err);
@@ -160,71 +177,236 @@ app.post('/api/initiate-deposit', async (req, res) => {
 app.post('/api/payhero-callback', async (req, res) => {
   try {
     console.log('PayHero Callback received:', JSON.stringify(req.body));
-    const { external_reference, status, amount, phone_number } = req.body || {};
+    const body = req.body || {};
+    const resp = body.response || body.data || body;
+
+    const external_reference = body.external_reference || resp.ExternalReference || resp.external_reference || body.ExternalReference || resp.reference || body.reference;
+    const rawStatus = (resp.Status || resp.status || body.Status || body.status || '').toString().toUpperCase();
+    const amountVal = Number(resp.Amount || resp.amount || body.Amount || body.amount || 0);
+    const phoneVal  = resp.Phone || resp.phone || resp.phone_number || body.phone_number || body.Phone || '';
 
     if (!external_reference) {
       return res.status(400).send('Missing external_reference');
     }
 
+    let pending = inMemoryDeposits.get(external_reference);
     const pendingRef = db.collection('pending_deposits').doc(external_reference);
-    const pendingDoc = await pendingRef.get();
 
-    if (!pendingDoc.exists) {
+    if (!pending) {
+      try {
+        const pendingDoc = await pendingRef.get();
+        if (pendingDoc.exists) pending = pendingDoc.data();
+      } catch (_) {}
+    }
+
+    if (!pending) {
       console.warn('No pending deposit found for ref:', external_reference);
       return res.status(200).send('OK');
     }
 
-    const pending = pendingDoc.data();
     if (pending.status === 'completed') {
       return res.status(200).send('Already processed');
     }
 
-    if (status === 'SUCCESS') {
-      const amount_kes = amount || pending.amount_kes;
+    const isSuccess = rawStatus === 'SUCCESS' || rawStatus === 'SUCCESSFUL' || rawStatus === 'COMPLETED' || rawStatus === 'COMPLETE';
+
+    if (isSuccess) {
+      const amount_kes = amountVal || pending.amount_kes;
       const amount_usd = kesToUsd(amount_kes);
 
-      const userRef = db.collection('users').doc(pending.uid);
-      await db.runTransaction(async (tx) => {
-        const userDoc = await tx.get(userRef);
-        const currentBalance = userDoc.exists ? (userDoc.data().balance || 0) : 0;
-        const currentTxns    = userDoc.exists ? (userDoc.data().transactions || []) : [];
+      const targetUid = pending.uid;
+      const currentInMem = inMemoryUsers.get(targetUid) || 0;
+      const newInMemBal = parseFloat((currentInMem + amount_usd).toFixed(2));
+      inMemoryUsers.set(targetUid, newInMemBal);
 
-        tx.set(userRef, {
-          balance: parseFloat((currentBalance + amount_usd).toFixed(2)),
-          transactions: [
-            ...currentTxns,
-            {
-              type: 'deposit',
-              amount: amount_usd,
-              amount_kes,
-              method: 'M-Pesa',
-              reference: external_reference,
-              phone: phone_number || pending.phone,
-              ts: Date.now(),
-            },
-          ].slice(-200),
-        }, { merge: true });
-      });
-
-      await pendingRef.update({
+      // Update in-memory
+      inMemoryDeposits.set(external_reference, {
+        ...pending,
         status: 'completed',
         amount_usd,
-        completed_at: admin.firestore.FieldValue.serverTimestamp(),
+        balance: newInMemBal,
+        completedAt: Date.now(),
       });
 
-      console.log(`Deposit confirmed: ${external_reference} → +$${amount_usd} for uid ${pending.uid}`);
+      // Update Firestore user balance
+      let newBalance = newInMemBal;
+      try {
+        const userRef = db.collection('users').doc(targetUid);
+        await db.runTransaction(async (tx) => {
+          const userDoc = await tx.get(userRef);
+          const currentBalance = userDoc.exists ? (userDoc.data().balance || 0) : 0;
+          const currentTxns    = userDoc.exists ? (userDoc.data().transactions || []) : [];
+          newBalance = parseFloat((currentBalance + amount_usd).toFixed(2));
+          inMemoryUsers.set(targetUid, newBalance);
+
+          tx.set(userRef, {
+            balance: newBalance,
+            transactions: [
+              ...currentTxns,
+              {
+                type: 'deposit',
+                amount: amount_usd,
+                amount_kes,
+                method: 'M-Pesa',
+                reference: external_reference,
+                phone: phoneVal || pending.phone,
+                ts: Date.now(),
+              },
+            ].slice(-200),
+          }, { merge: true });
+        });
+
+        await pendingRef.update({
+          status: 'completed',
+          amount_usd,
+          completed_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (errDb) {
+        console.warn('Firestore update in callback warning:', errDb.message);
+      }
+
+      console.log(`Deposit confirmed: ${external_reference} → +$${amount_usd} for uid ${targetUid} (New Bal: $${newBalance})`);
     } else {
-      await pendingRef.update({
-        status: (status || 'failed').toLowerCase(),
-        failed_at: admin.firestore.FieldValue.serverTimestamp(),
+      inMemoryDeposits.set(external_reference, {
+        ...pending,
+        status: rawStatus.toLowerCase() || 'failed',
+        failedAt: Date.now(),
       });
-      console.log(`Deposit ${status}: ${external_reference}`);
+      try {
+        await pendingRef.update({
+          status: (rawStatus || 'failed').toLowerCase(),
+          failed_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
+      console.log(`Deposit ${rawStatus}: ${external_reference}`);
     }
 
     return res.status(200).send('OK');
   } catch (err) {
     console.error('Callback error:', err);
     return res.status(500).send('Error processing callback');
+  }
+});
+
+/* ─── 3. Check Deposit Status (Polling Endpoint) ─────────── */
+app.get('/api/check-deposit-status', async (req, res) => {
+  try {
+    const { reference, uid } = req.query;
+    if (!reference) return res.status(400).json({ success: false, error: 'Missing reference' });
+
+    let pending = inMemoryDeposits.get(reference);
+    const pendingRef = db.collection('pending_deposits').doc(reference);
+
+    if (!pending) {
+      try {
+        const doc = await pendingRef.get();
+        if (doc.exists) pending = doc.data();
+      } catch (_) {}
+    }
+
+    if (!pending) {
+      return res.status(404).json({ success: false, error: 'Deposit record not found' });
+    }
+
+    const targetUid = uid || pending.uid;
+
+    // If completed, return latest balance immediately
+    if (pending.status === 'completed') {
+      let latestBal = pending.amount_usd || 0;
+      try {
+        const userDoc = await db.collection('users').doc(targetUid).get();
+        if (userDoc.exists && typeof userDoc.data().balance === 'number') {
+          latestBal = userDoc.data().balance;
+        }
+      } catch (_) {}
+
+      return res.json({
+        success: true,
+        status: 'completed',
+        amount_usd: pending.amount_usd,
+        amount_kes: pending.amount_kes,
+        balance: latestBal,
+      });
+    }
+
+    // If still pending, query PayHero API directly to check if STK push finished
+    try {
+      const phCheckUrl = `https://backend.payhero.co.ke/api/v2/payments?external_reference=${encodeURIComponent(reference)}`;
+      const phRes = await fetch(phCheckUrl, {
+        headers: { 'Authorization': payheroAuth() },
+      });
+
+      if (phRes.ok) {
+        const phData = await phRes.json();
+        const payment = (phData.data && phData.data[0]) || phData.response || phData;
+        const phStatus = ((payment && (payment.status || payment.Status)) || '').toString().toUpperCase();
+
+        if (phStatus === 'SUCCESS' || phStatus === 'SUCCESSFUL' || phStatus === 'COMPLETED') {
+          const amount_kes = Number(payment.amount || payment.Amount || pending.amount_kes);
+          const amount_usd = kesToUsd(amount_kes);
+
+          let newBal = amount_usd;
+          try {
+            const userRef = db.collection('users').doc(targetUid);
+            await db.runTransaction(async (tx) => {
+              const userDoc = await tx.get(userRef);
+              const currentBal = userDoc.exists ? (userDoc.data().balance || 0) : 0;
+              const currentTx  = userDoc.exists ? (userDoc.data().transactions || []) : [];
+              newBal = parseFloat((currentBal + amount_usd).toFixed(2));
+
+              tx.set(userRef, {
+                balance: newBal,
+                transactions: [
+                  ...currentTx,
+                  {
+                    type: 'deposit',
+                    amount: amount_usd,
+                    amount_kes,
+                    method: 'M-Pesa',
+                    reference,
+                    phone: payment.phone_number || payment.Phone || pending.phone,
+                    ts: Date.now(),
+                  },
+                ].slice(-200),
+              }, { merge: true });
+            });
+
+            await pendingRef.update({
+              status: 'completed',
+              amount_usd,
+              completed_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          } catch (_) {}
+
+          inMemoryDeposits.set(reference, {
+            ...pending,
+            status: 'completed',
+            amount_usd,
+            completedAt: Date.now(),
+          });
+
+          return res.json({
+            success: true,
+            status: 'completed',
+            amount_usd,
+            amount_kes,
+            balance: newBal,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('PayHero direct verification error:', e.message);
+    }
+
+    return res.json({
+      success: true,
+      status: pending.status || 'pending',
+      amount_usd: pending.amount_usd,
+      amount_kes: pending.amount_kes,
+    });
+  } catch (err) {
+    console.error('checkDepositStatus error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

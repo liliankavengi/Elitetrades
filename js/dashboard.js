@@ -33,16 +33,19 @@
   let firestoreUid = null;
 
   function getUid() {
-    if (firestoreUid) return firestoreUid;
     if (typeof auth !== 'undefined' && auth.currentUser) {
       firestoreUid = auth.currentUser.uid;
+      localStorage.setItem('et_uid', firestoreUid);
       return firestoreUid;
     }
+    if (firestoreUid && !firestoreUid.startsWith('usr_')) return firestoreUid;
     let cached = localStorage.getItem('et_uid');
-    if (!cached) {
-      cached = 'usr_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-      localStorage.setItem('et_uid', cached);
+    if (cached) {
+      firestoreUid = cached;
+      return firestoreUid;
     }
+    cached = 'usr_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('et_uid', cached);
     firestoreUid = cached;
     return firestoreUid;
   }
@@ -1280,14 +1283,15 @@
      11c. M-PESA DEPOSIT: PayHero STK Push via Cloud Function
   ═══════════════════════════════════════════════════════════ */
   let mpesaUnsubscribe = null; // Firestore listener cleanup
+  let mpesaPollTimer   = null; // Real-time backend status poller
 
   document.getElementById('mpesaDepositForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideDepositError();
 
-    const phone    = document.getElementById('mpesaPhone')?.value.trim();
-    const kes      = parseInt(document.getElementById('mpesaAmount')?.value);
-    const btn      = document.getElementById('mpesaDepositBtn');
+    const phone = document.getElementById('mpesaPhone')?.value.trim();
+    const kes   = parseInt(document.getElementById('mpesaAmount')?.value);
+    const btn   = document.getElementById('mpesaDepositBtn');
 
     if (!phone || !/^(\+?254[17]\d{8}|0[17]\d{8})$/.test(phone.replace(/\s/g, ''))) {
       showDepositError('Enter a valid M-Pesa number (07xx, 01xx, +2547xx or +2541xx).'); return;
@@ -1314,54 +1318,95 @@
         throw new Error(errMsg);
       }
 
-      const result = { data: resData };
-      const ref = result.data.reference;
+      const ref = resData.reference;
+      const expectedUsd = resData.amount_usd || parseFloat((kes / KES_RATE).toFixed(2));
 
       // Switch to waiting UI
       document.getElementById('mpesaDepositForm').style.display = 'none';
       document.getElementById('mpesaWaiting').style.display     = '';
 
-      // Listen for Firestore status change (updated by PayHero callback)
-      if (typeof db !== 'undefined') {
-        mpesaUnsubscribe = db.collection('pending_deposits').doc(ref)
-          .onSnapshot((snap) => {
-            const data = snap.data();
-            if (!data) return;
+      let depositFinished = false;
 
-            if (data.status === 'completed') {
+      function onDepositCompleted(finalBalance, amountUsd) {
+        if (depositFinished) return;
+        depositFinished = true;
+
+        if (mpesaPollTimer) { clearInterval(mpesaPollTimer); mpesaPollTimer = null; }
+        if (mpesaUnsubscribe) { mpesaUnsubscribe(); mpesaUnsubscribe = null; }
+
+        const creditedUsd = Number(amountUsd) || expectedUsd;
+        if (typeof finalBalance === 'number' && finalBalance > 0) {
+          state.balance = parseFloat(finalBalance.toFixed(2));
+        } else {
+          state.balance = parseFloat((state.balance + creditedUsd).toFixed(2));
+        }
+
+        // Add to transactions
+        state.transactions.unshift({
+          type: 'deposit',
+          amount: creditedUsd,
+          amount_kes: kes,
+          method: 'M-Pesa',
+          reference: ref,
+          ts: Date.now(),
+        });
+
+        saveState(state);
+        updateBalanceUI('win');
+        closeModal(depositModal);
+
+        document.getElementById('mpesaWaiting').style.display     = 'none';
+        document.getElementById('mpesaDepositForm').style.display  = '';
+        document.getElementById('mpesaDepositForm').reset();
+        btn.textContent = 'Send M-Pesa Prompt';
+        btn.disabled    = false;
+
+        showToast(`Deposit of KES ${kes.toLocaleString()} (~$${creditedUsd.toFixed(2)}) confirmed! Balance updated instantly.`, 'success');
+      }
+
+      // 1. Instant Polling Channel (every 1.5 seconds)
+      let pollTicks = 0;
+      mpesaPollTimer = setInterval(async () => {
+        pollTicks++;
+        try {
+          const pollRes = await fetch(`/api/check-deposit-status?reference=${encodeURIComponent(ref)}&uid=${encodeURIComponent(activeUid)}`);
+          if (pollRes.ok) {
+            const pollData = await pollRes.json();
+            if (pollData.status === 'completed') {
+              onDepositCompleted(pollData.balance, pollData.amount_usd);
+              return;
+            } else if (pollData.status === 'failed' || pollData.status === 'cancelled') {
+              depositFinished = true;
+              clearInterval(mpesaPollTimer);
+              mpesaPollTimer = null;
               if (mpesaUnsubscribe) { mpesaUnsubscribe(); mpesaUnsubscribe = null; }
-
-              // Reload user balance from Firestore
-              db.collection('users').doc(activeUid).get().then(userDoc => {
-                if (userDoc.exists) {
-                  const d = userDoc.data();
-                  state.balance      = d.balance || 0;
-                  state.transactions = d.transactions || [];
-                  updateBalanceUI('win');
-                  updateStats();
-                  renderHistory();
-                }
-              }).catch(() => {});
-
-              closeModal(depositModal);
               document.getElementById('mpesaWaiting').style.display     = 'none';
               document.getElementById('mpesaDepositForm').style.display  = '';
-              document.getElementById('mpesaDepositForm').reset();
               btn.textContent = 'Send M-Pesa Prompt';
               btn.disabled    = false;
-              showToast(`Deposit of KES ${kes} (~$${data.amount_usd}) confirmed!`, 'success');
-
-            } else if (data.status === 'failed' || data.status === 'cancelled') {
-              if (mpesaUnsubscribe) { mpesaUnsubscribe(); mpesaUnsubscribe = null; }
-              document.getElementById('mpesaWaiting').style.display     = 'none';
-              document.getElementById('mpesaDepositForm').style.display  = '';
-              btn.textContent = 'Send M-Pesa Prompt';
-              btn.disabled    = false;
-              showDepositError('Payment was ' + data.status + '. Please try again.');
+              showDepositError('Payment was ' + pollData.status + '. Please try again.');
+              return;
             }
-          }, (err) => {
-            console.warn('Firestore pending_deposits listener:', err.message);
-          });
+          }
+        } catch (_) {}
+
+        if (pollTicks > 60) {
+          clearInterval(mpesaPollTimer);
+          mpesaPollTimer = null;
+        }
+      }, 1500);
+
+      // 2. Real-time Firestore Channel
+      if (typeof db !== 'undefined') {
+        try {
+          mpesaUnsubscribe = db.collection('pending_deposits').doc(ref)
+            .onSnapshot((snap) => {
+              const data = snap.data();
+              if (data && data.status === 'completed') {
+                onDepositCompleted(null, data.amount_usd);
+              }
+            }, () => {});
+        } catch (_) {}
       }
 
     } catch (err) {
@@ -1370,6 +1415,16 @@
       showDepositError(err.message || 'Could not initiate M-Pesa payment. Try again.');
       console.error('M-Pesa deposit error:', err);
     }
+  });
+
+  // Cancel waiting button
+  document.getElementById('mpesaCancelWait')?.addEventListener('click', () => {
+    if (mpesaPollTimer) { clearInterval(mpesaPollTimer); mpesaPollTimer = null; }
+    if (mpesaUnsubscribe) { mpesaUnsubscribe(); mpesaUnsubscribe = null; }
+    document.getElementById('mpesaWaiting').style.display     = 'none';
+    document.getElementById('mpesaDepositForm').style.display  = '';
+    const btn = document.getElementById('mpesaDepositBtn');
+    if (btn) { btn.textContent = 'Send M-Pesa Prompt'; btn.disabled = false; }
   });
 
   /* ═══════════════════════════════════════════════════════════

@@ -84,6 +84,16 @@
           createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
         });
 
+        /* Sync local cache immediately with the new account's credentials */
+        localStorage.setItem('et_uid', cred.user.uid);
+        localStorage.setItem('et_user_name', name);
+        localStorage.setItem('et_user_email', email);
+        localStorage.setItem('et_user_phone', phone);
+        localStorage.setItem('et_state_cache', JSON.stringify({
+          balance: 0,
+          transactions: []
+        }));
+
         /* 4. Redirect to dashboard */
         window.location.href = 'dashboard.html';
 
@@ -120,7 +130,10 @@
         await auth.setPersistence(persistence);
 
         /* Sign in */
-        await auth.signInWithEmailAndPassword(email, password);
+        const cred = await auth.signInWithEmailAndPassword(email, password);
+        if (cred.user) {
+          localStorage.setItem('et_uid', cred.user.uid);
+        }
 
         /* Redirect to dashboard */
         window.location.href = 'dashboard.html';
