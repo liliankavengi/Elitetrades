@@ -18,227 +18,326 @@
   <!-- ══════════════════════════════════════
        DASHBOARD HEADER
   ══════════════════════════════════════ -->
-  <header class="dashboard-header" role="banner">
-    <div class="container">
-      <div class="dash-nav">
-        <!-- Logo -->
-        <a href="index.html" class="logo" aria-label="EliteTrades Home">
-          <div class="logo-icon">ET</div>
-          <span class="logo-text">Elite<span>Trades</span></span>
+  <header class="st-header" role="banner">
+    <div class="st-header-left">
+      <!-- Logo -->
+      <a href="index.html" class="st-logo" aria-label="EliteTrades Home">
+        <div class="st-logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 16 4-4 4 4 6-7 4 4"/>
+          </svg>
+        </div>
+        <span class="st-logo-text">Elite<span>Trades</span></span>
+      </a>
+
+      <!-- Primary Navigation -->
+      <nav class="st-main-nav" aria-label="Primary Navigation">
+        <a href="dashboard.html" class="st-nav-item active">
+          <i data-lucide="trending-up" class="lucide-sm"></i>
+          <span>Trade</span>
         </a>
-
-        <!-- Balance -->
-        <div class="balance-display" aria-live="polite" aria-label="Account balance">
-          <div>
-            <div class="balance-label">Balance</div>
-            <div class="balance-amount" id="dashBalance">$0.00</div>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="dash-actions">
-          <button class="btn btn-primary btn-sm" data-open-deposit id="depositHeaderBtn">
-            + Deposit
-          </button>
-          <button class="btn btn-ghost btn-sm" data-open-withdraw id="withdrawHeaderBtn">
-            Withdraw
-          </button>
-          <button class="btn btn-ghost btn-sm" data-signout title="Sign out" aria-label="Sign out">
-            Sign Out
-          </button>
-        </div>
-
-        <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
-          <span></span><span></span><span></span>
+        <button class="st-nav-item" data-open-deposit>
+          <i data-lucide="wallet" class="lucide-sm"></i>
+          <span>Wallet</span>
         </button>
+        <button class="st-nav-item" id="btnToggleHistory">
+          <i data-lucide="history" class="lucide-sm"></i>
+          <span>History</span>
+        </button>
+        <button class="st-nav-item" id="btnRefer">
+          <i data-lucide="gift" class="lucide-sm"></i>
+          <span>Refer</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="st-header-right">
+      <!-- Live Account Badge -->
+      <div class="st-account-badge">
+        <span class="st-live-dot"></span>
+        <span class="st-account-text">LIVE ACCOUNT</span>
+        <span class="st-account-id" id="accountBadgeId">ET-375286</span>
       </div>
+
+      <!-- Real Balance Pill -->
+      <div class="st-balance-pill" id="headerBalancePill" data-open-deposit title="Click to deposit funds">
+        <span class="st-balance-type">REAL</span>
+        <span class="st-balance-value" id="dashBalance">$0.00</span>
+        <i data-lucide="chevron-down" class="lucide-xs"></i>
+      </div>
+
+      <!-- Withdraw Button (Purple rounded) -->
+      <button class="st-btn-withdraw" data-open-withdraw id="withdrawHeaderBtn">
+        <i data-lucide="arrow-up-right" class="lucide-sm"></i>
+        <span>Withdraw</span>
+      </button>
+
+      <!-- User Avatar Circle -->
+      <div class="st-user-avatar" id="userAvatar" title="User Profile">
+        <span id="userAvatarInitial">ET</span>
+      </div>
+
+      <!-- Theme Toggle -->
+      <button class="st-icon-btn" id="themeToggleBtn" title="Toggle theme" aria-label="Toggle theme">
+        <i data-lucide="sun" class="lucide-sm"></i>
+      </button>
+
+      <!-- Sign Out -->
+      <button class="st-icon-btn" data-signout title="Sign out" aria-label="Sign out">
+        <i data-lucide="log-out" class="lucide-sm"></i>
+      </button>
     </div>
   </header>
 
-  <!-- Mobile Menu -->
-  <nav class="mobile-menu" id="mobileMenu" aria-label="Mobile navigation">
-    <div style="padding:12px 0;border-bottom:1px solid var(--border);font-size:0.88rem;color:var(--text-muted);" id="userGreeting">Hello, Trader</div>
-    <button class="btn btn-primary btn-full" data-open-deposit style="margin-top:8px;">+ Deposit Funds</button>
-    <button class="btn btn-ghost btn-full" data-open-withdraw style="margin-top:8px;">Withdraw</button>
-    <button class="btn btn-ghost btn-full" data-signout style="margin-top:8px;">Sign Out</button>
-  </nav>
+  <!-- ══════════════════════════════════════
+       MAIN 3-PANE WORKSPACE
+  ══════════════════════════════════════ -->
+  <main class="st-workspace" id="main-content">
 
-  <main id="main-content">
-    <div class="container">
+    <!-- 1. LEFT COLUMN: POSITIONS DRAWER -->
+    <aside class="st-positions-col" aria-label="Positions">
+      <div class="st-positions-header">
+        <button class="st-pos-tab active" data-pos-tab="open" id="tabOpenPositions">
+          Open (<span id="openCount">0</span>)
+        </button>
+        <button class="st-pos-tab" data-pos-tab="closed" id="tabClosedPositions">
+          Closed (<span id="closedCount">0</span>)
+        </button>
+      </div>
 
-      <!-- ═══════════════════════════════
-           STATS BAR
-      ═══════════════════════════════ -->
-      <div class="dash-stats" style="margin-top:24px;" aria-label="Account statistics">
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">Balance</div>
-          <div class="dash-stat-value" id="statBalance">$0.00</div>
+      <div class="st-positions-body">
+        <div class="st-positions-empty" id="openPositionsEmpty">
+          <p>No open positions yet.</p>
         </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">Trades Won</div>
-          <div class="dash-stat-value positive" id="statWins">0</div>
+        <div class="st-positions-list" id="openPositionsList" style="display:none;"></div>
+
+        <div class="st-positions-empty" id="closedPositionsEmpty" style="display:none;">
+          <p>No closed positions yet.</p>
         </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">Trades Lost</div>
-          <div class="dash-stat-value negative" id="statLosses">0</div>
+        <div class="st-positions-list" id="closedPositionsList" style="display:none;"></div>
+      </div>
+    </aside>
+
+    <!-- 2. CENTER COLUMN: CHART & DIGITS WORKSPACE -->
+    <section class="st-chart-col" aria-label="Market Chart and Analytics">
+      <!-- Market Info Header -->
+      <div class="st-market-header">
+        <div class="st-market-title-wrap">
+          <div class="st-market-select-row">
+            <div class="st-market-dropdown-trigger" id="marketDropdownTrigger">
+              <span class="st-market-name" id="selectedMarketName">Volatility 100 (1s) Index</span>
+              <i data-lucide="chevron-down" class="lucide-sm"></i>
+            </div>
+            <!-- Custom Dropdown Menu -->
+            <div class="st-market-menu" id="marketMenu" style="display:none;">
+              <button class="st-market-opt active" data-market-id="v100">Volatility 100 (1s) Index</button>
+              <button class="st-market-opt" data-market-id="v75">Volatility 75 Index</button>
+              <button class="st-market-opt" data-market-id="v50">Volatility 50 Index</button>
+              <button class="st-market-opt" data-market-id="v25">Volatility 25 Index</button>
+              <button class="st-market-opt" data-market-id="v10">Volatility 10 Index</button>
+            </div>
+
+            <span class="st-badge-live">
+              <span class="st-live-dot-sm"></span> LIVE
+            </span>
+            <button class="st-alert-btn" id="alertBtn" title="Set price alert">
+              <i data-lucide="bell" class="lucide-xs"></i>
+              <span>Alert</span>
+            </button>
+          </div>
+
+          <div class="st-market-subtitle">
+            Very High volatility &bull; synthetic index
+          </div>
+
+          <div class="st-market-stats-row">
+            <span class="st-stat-chip">High <strong id="statHigh">733.72</strong></span>
+            <span class="st-stat-chip">Low <strong id="statLow">726.01</strong></span>
+            <span class="st-stat-source">Live &bull; Deriv feed</span>
+          </div>
         </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">Net Profit</div>
-          <div class="dash-stat-value" id="statProfit">$0.00</div>
+
+        <!-- Big Live Price & Last Digit Banner -->
+        <div class="st-market-price-wrap">
+          <div class="st-last-digit-box">
+            <span class="st-last-digit-label">LAST DIGIT</span>
+            <span class="st-last-digit-num" id="liveLastDigit">3</span>
+          </div>
+          <div class="st-price-block">
+            <div class="st-big-price" id="livePrice">730.03</div>
+            <div class="st-price-delta down" id="priceChange">▼ -12.60%</div>
+          </div>
         </div>
       </div>
 
-      <!-- ═══════════════════════════════
-           MAIN DASHBOARD GRID
-      ═══════════════════════════════ -->
-      <div class="dashboard-grid">
+      <!-- Chart Viewport -->
+      <div class="st-chart-container">
+        <canvas id="marketChart"></canvas>
+        <div class="st-chart-y-axis" id="chartYAxis">
+          <span class="st-y-level" id="yLevelMax">734.21</span>
+          <span class="st-y-level" id="yLevelMidHigh">731.07</span>
+          <span class="st-y-level current" id="yLevelCurrent">730.03</span>
+          <span class="st-y-level" id="yLevelMidLow">729.07</span>
+          <span class="st-y-level" id="yLevelMin">727.07</span>
+        </div>
+        <div class="st-chart-x-axis" id="chartXAxis">
+          <span class="st-x-time">37:31</span>
+          <span class="st-x-time">37:42</span>
+          <span class="st-x-time">37:53</span>
+          <span class="st-x-time">38:04</span>
+          <span class="st-x-time">38:15</span>
+          <span class="st-x-time">38:26</span>
+          <span class="st-x-time">38:38</span>
+          <span class="st-x-time">38:49</span>
+          <span class="st-x-time">39:01</span>
+        </div>
+      </div>
 
-        <!-- LEFT: TRADING PANEL -->
-        <aside aria-label="Trading panel">
-          <div class="trade-panel">
-            <div class="trade-panel-header">
-              <span class="trade-panel-title">Place a Trade</span>
-              <span class="badge badge-positive" style="font-size:0.72rem;">
-                <span class="dot-pulse"></span> Live
-              </span>
-            </div>
+      <!-- LIVE LAST DIGITS ANALYSIS BAR -->
+      <div class="st-digits-bar">
+        <div class="st-digits-bar-header">
+          <span class="st-digits-title"><i data-lucide="hash" class="lucide-xs"></i> LIVE LAST DIGITS</span>
+          <span class="st-digits-hint">tap a number to set your barrier</span>
+        </div>
 
-            <!-- Market Selector -->
-            <div class="market-selector">
-              <label for="marketSelect">Market</label>
-              <select class="market-select-input" id="marketSelect" aria-label="Select a market">
-                <!-- Populated by JS -->
-              </select>
-            </div>
+        <div class="st-digits-grid" id="digitsGrid">
+          <!-- Digits 0 - 9 injected by JS -->
+        </div>
+      </div>
+    </section>
 
-            <!-- Live Price -->
-            <div class="live-price-display" aria-live="polite" aria-label="Live market price">
-              <div>
-                <div class="live-price-number" id="livePrice">8,842.50</div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">Live price</div>
-              </div>
-              <div class="live-price-meta">
-                <span class="live-price-change up" id="priceChange">+0.021%</span>
-                <span class="live-price-label">24h change</span>
-              </div>
-            </div>
+    <!-- 3. RIGHT COLUMN: TRADING EXECUTION PANEL -->
+    <aside class="st-trade-col" aria-label="Trade Execution">
+      <div class="st-trade-card">
+        <!-- Mode Switcher: Manual / Auto / AI -->
+        <div class="st-mode-row">
+          <button class="st-mode-btn active" data-mode="manual">Manual</button>
+          <button class="st-mode-btn" data-mode="auto">Auto</button>
+          <button class="st-mode-btn ai-mode" data-mode="ai">
+            <i data-lucide="sparkles" class="lucide-xs"></i> AI
+          </button>
+        </div>
 
-            <!-- Duration Selector -->
-            <div class="duration-selector">
-              <label>Contract Duration</label>
-              <div class="duration-pills">
-                <button class="duration-pill" data-duration="15s">15s</button>
-                <button class="duration-pill" data-duration="30s">30s</button>
-                <button class="duration-pill active" data-duration="1m">1 min</button>
-                <button class="duration-pill" data-duration="2m">2 min</button>
-                <button class="duration-pill" data-duration="5m">5 min</button>
-              </div>
-            </div>
+        <!-- Category Tabs: Rise/Fall | Digits | Multipliers -->
+        <div class="st-category-row">
+          <button class="st-cat-btn" data-category="risefall">Rise/Fall</button>
+          <button class="st-cat-btn active" data-category="digits">Digits</button>
+          <button class="st-cat-btn" data-category="multipliers">Multipliers</button>
+        </div>
 
-            <!-- Stake Input -->
-            <div class="stake-section">
-              <div class="stake-label-row">
-                <span class="stake-label">Your Stake</span>
-                <span class="balance-available">Available: <span id="stakeBalanceLabel">$0.00</span></span>
-              </div>
-              <div class="stake-input-row">
-                <div class="stake-input-wrap">
-                  <span class="stake-currency">$</span>
-                  <input
-                    class="stake-input"
-                    type="number"
-                    id="stakeInput"
-                    value="1.00"
-                    min="0.35"
-                    step="0.01"
-                    placeholder="0.00"
-                    aria-label="Stake amount in USD"
-                  />
-                </div>
-              </div>
-              <div class="stake-quick-btns">
-                <button class="stake-quick" data-value="1">+$1</button>
-                <button class="stake-quick" data-value="5">+$5</button>
-                <button class="stake-quick" data-value="10">+$10</button>
-                <button class="stake-quick" data-value="50">+$50</button>
-                <button class="stake-quick" data-value="all">Max</button>
-              </div>
-            </div>
-
-            <!-- Payout Preview -->
-            <div class="payout-preview" aria-label="Payout breakdown">
-              <div class="payout-preview-item">
-                <span class="payout-preview-label">Stake</span>
-                <span class="payout-preview-value" id="previewStake">$1.00</span>
-              </div>
-              <div class="payout-divider"></div>
-              <div class="payout-preview-item">
-                <span class="payout-preview-label">If You Win</span>
-                <span class="payout-preview-value win-amount" id="potentialWin">+$0.35</span>
-              </div>
-              <div class="payout-divider"></div>
-              <div class="payout-preview-item">
-                <span class="payout-preview-label">Total Return</span>
-                <span class="payout-preview-value" id="potentialReturn">$1.35</span>
-              </div>
-              <div class="payout-divider"></div>
-              <div class="payout-preview-item">
-                <span class="payout-preview-label">If You Lose</span>
-                <span class="payout-preview-value loss-amount" id="potentialLoss">−$1.00</span>
-              </div>
-            </div>
-
-            <!-- Trade Buttons -->
-            <div class="trade-buttons">
-              <button class="btn-rise" id="riseBtn" aria-label="Place Rise contract">
-                ▲ Rise
-                <span>Market goes up</span>
-              </button>
-              <button class="btn-fall" id="fallBtn" aria-label="Place Fall contract">
-                ▼ Fall
-                <span>Market goes down</span>
-              </button>
-            </div>
-
-            <!-- Payout rule note -->
-            <div style="padding:12px 20px;border-top:1px solid var(--border);text-align:center;">
-              <p style="font-size:0.75rem;color:var(--text-muted);line-height:1.6;">
-                Payout: <strong style="color:var(--white);">35%</strong> of stake on a win.
-                $1 stake wins <strong style="color:var(--positive);">+$0.35</strong> profit.
-                Max loss is your stake.
-                <a href="how-it-works.html" style="color:var(--accent);">Full rules</a>
-              </p>
-            </div>
+        <!-- Stake Control -->
+        <div class="st-stake-section">
+          <div class="st-stake-top-row">
+            <span class="st-stake-label">Stake (USD)</span>
+            <span class="st-stake-wallet">
+              <i data-lucide="wallet" class="lucide-xs"></i>
+              <span id="panelAvailableBalance">$0.00</span>
+            </span>
           </div>
-        </aside>
 
-        <!-- RIGHT: HISTORY PANEL -->
-        <section aria-label="Transaction history">
-          <div class="history-panel">
-            <div class="history-panel-header">
-              <h2 style="font-size:1rem;font-weight:700;color:var(--white);">Transaction History</h2>
-            </div>
-
-            <!-- Tabs -->
-            <div class="history-tabs" role="tablist">
-              <button class="history-tab active" data-tab="all" role="tab" aria-selected="true">All</button>
-              <button class="history-tab" data-tab="trades" role="tab" aria-selected="false">Trades</button>
-              <button class="history-tab" data-tab="deposits" role="tab" aria-selected="false">Deposits</button>
-              <button class="history-tab" data-tab="withdrawals" role="tab" aria-selected="false">Withdrawals</button>
-            </div>
-
-            <!-- List -->
-            <div class="history-list" id="historyList" role="list" aria-live="polite">
-              <div class="history-empty">
-                <div class="empty-icon"><i data-lucide="clipboard-list" class="lucide-lg" style="color:var(--text-muted);"></i></div>
-                <p>No transactions yet.<br>Deposit funds to begin trading.</p>
-              </div>
-            </div>
+          <div class="st-stepper-wrap">
+            <button class="st-step-btn" id="stakeMinus" aria-label="Decrease stake">&minus;</button>
+            <input
+              class="st-stepper-input"
+              type="number"
+              id="stakeInput"
+              value="10"
+              min="0.35"
+              step="1"
+              aria-label="Stake amount"
+            />
+            <button class="st-step-btn" id="stakePlus" aria-label="Increase stake">&plus;</button>
           </div>
-        </section>
 
-      </div><!-- /dashboard-grid -->
-    </div><!-- /container -->
+          <div class="st-kes-conversion" id="stakeKesConversion">
+            &sim; KES 1,300
+          </div>
+
+          <!-- Quick Chips: 1, 5, 10, 25, 50, 100 -->
+          <div class="st-quick-chips">
+            <button class="st-chip" data-stake="1">1</button>
+            <button class="st-chip" data-stake="5">5</button>
+            <button class="st-chip active" data-stake="10">10</button>
+            <button class="st-chip" data-stake="25">25</button>
+            <button class="st-chip" data-stake="50">50</button>
+            <button class="st-chip" data-stake="100">100</button>
+          </div>
+        </div>
+
+        <!-- DIGITS SUB-MODES: Over/Under | Even/Odd | Matches/Differs -->
+        <div class="st-digits-submodes" id="digitsSubmodes">
+          <button class="st-submode-pill active" data-digit-mode="over_under">Over / Under</button>
+          <button class="st-submode-pill" data-digit-mode="even_odd">Even / Odd</button>
+          <button class="st-submode-pill" data-digit-mode="matches_differs">Matches / Differs</button>
+        </div>
+
+        <!-- Barrier Digit Row -->
+        <div class="st-barrier-row" id="barrierRow">
+          <span class="st-barrier-label">Barrier digit</span>
+          <div class="st-barrier-badge-wrap">
+            <span class="st-barrier-badge" id="selectedBarrierBadge">5</span>
+            <span class="st-barrier-sub">tap chart digits</span>
+          </div>
+        </div>
+
+        <!-- Duration Row (for Rise/Fall) -->
+        <div class="st-duration-row" id="durationRow" style="display:none;">
+          <span class="st-barrier-label">Duration</span>
+          <div class="st-duration-pills">
+            <button class="st-dur-pill" data-dur="15s">15s</button>
+            <button class="st-dur-pill" data-dur="30s">30s</button>
+            <button class="st-dur-pill active" data-dur="1m">1m</button>
+            <button class="st-dur-pill" data-dur="2m">2m</button>
+            <button class="st-dur-pill" data-dur="5m">5m</button>
+          </div>
+        </div>
+
+        <!-- Action Execution Buttons -->
+        <div class="st-actions-grid" id="digitsActions">
+          <button class="st-action-btn st-btn-over" id="btnOver">
+            <div class="st-act-head">
+              <span class="st-act-title" id="lblOver">OVER 5</span>
+              <span class="st-act-payout-pct" id="pctOver">+138%</span>
+            </div>
+            <div class="st-act-sub" id="payoutOver">Payout $23.80</div>
+          </button>
+
+          <button class="st-action-btn st-btn-under" id="btnUnder">
+            <div class="st-act-head">
+              <span class="st-act-title" id="lblUnder">UNDER 5</span>
+              <span class="st-act-payout-pct" id="pctUnder">+90%</span>
+            </div>
+            <div class="st-act-sub" id="payoutUnder">Payout $19.00</div>
+          </button>
+        </div>
+
+        <!-- Alternate Action Buttons for Rise/Fall -->
+        <div class="st-actions-grid" id="riseFallActions" style="display:none;">
+          <button class="st-action-btn st-btn-over" id="riseBtn">
+            <div class="st-act-head">
+              <span class="st-act-title">RISE</span>
+              <span class="st-act-payout-pct">+95%</span>
+            </div>
+            <div class="st-act-sub" id="payoutRise">Payout $19.50</div>
+          </button>
+
+          <button class="st-action-btn st-btn-under" id="fallBtn">
+            <div class="st-act-head">
+              <span class="st-act-title">FALL</span>
+              <span class="st-act-payout-pct">+95%</span>
+            </div>
+            <div class="st-act-sub" id="payoutFall">Payout $19.50</div>
+          </button>
+        </div>
+
+        <!-- Balance Warning / Deposit Link -->
+        <div class="st-balance-status" id="balanceStatusHint">
+          <span>Not enough balance &bull; </span>
+          <button type="button" class="st-deposit-link" data-open-deposit>deposit</button>
+        </div>
+      </div>
+    </aside>
+
   </main>
 
   <!-- ══════════════════════════════════════

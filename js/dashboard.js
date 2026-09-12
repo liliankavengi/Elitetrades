@@ -1,43 +1,37 @@
 /* ===========================================================
-   ELITETRADES - dashboard.js
-   Wallet | Deposit | Withdraw | Trading Engine (35% payout)
+   ELITETRADES - SinTrades-Style Trading Engine & Dashboard
+   Real-Time Neon Volatility Charts | Digits Analyzer | Multi-Market
    =========================================================== */
 
 (function () {
   'use strict';
 
   /* ══════════════════════════════════════════════════════
-     CONSTANTS & CONFIG
+     1. CONSTANTS & MARKETS
   ══════════════════════════════════════════════════════ */
-  const PAYOUT_RATE    = 0.35;   // Win $0.35 per $1 staked
-  const WIN_CHANCE     = 0.47;   // 47% chance of winning per trade
-  const MIN_STAKE      = 0.35;
-  const MIN_WITHDRAW   = 1.00;
+  const MIN_STAKE    = 0.35;
+  const MIN_WITHDRAW = 1.00;
+  const KES_RATE     = 130;
 
   const MARKETS = [
-    { id: 'v100', name: 'Volatility 100 Index', symbol: 'V100', base: 8842.50,  vol: 0.0005 },
-    { id: 'v75',  name: 'Volatility 75 Index',  symbol: 'V75',  base: 12485.20, vol: 0.0004 },
-    { id: 'v50',  name: 'Volatility 50 Index',  symbol: 'V50',  base: 5932.10,  vol: 0.0003 },
-    { id: 'v25',  name: 'Volatility 25 Index',  symbol: 'V25',  base: 2318.75,  vol: 0.00025 },
-    { id: 'v10',  name: 'Volatility 10 Index',  symbol: 'V10',  base: 1045.60,  vol: 0.0002 },
+    { id: 'v100', name: 'Volatility 100 (1s) Index', symbol: 'V100 (1s)', base: 730.03, vol: 0.0006 },
+    { id: 'v75',  name: 'Volatility 75 Index',       symbol: 'V75',       base: 12485.20, vol: 0.0004 },
+    { id: 'v50',  name: 'Volatility 50 Index',       symbol: 'V50',       base: 5932.10,  vol: 0.0003 },
+    { id: 'v25',  name: 'Volatility 25 Index',       symbol: 'V25',       base: 2318.75,  vol: 0.00025 },
+    { id: 'v10',  name: 'Volatility 10 Index',       symbol: 'V10',       base: 1045.60,  vol: 0.0002 },
   ];
 
-  const DURATIONS = ['15s', '30s', '1m', '2m', '5m'];
-
   /* ══════════════════════════════════════════════════════
-     FIRESTORE STATE MANAGEMENT
+     2. STATE MANAGEMENT
   ══════════════════════════════════════════════════════ */
-
-  // In-memory state: populated from Firestore after auth
   let state = {
     user:         { name: 'Trader', email: '' },
     balance:      0,
     transactions: [],
   };
 
-  let firestoreUid = null;   // set after auth resolves
+  let firestoreUid = null;
 
-  // Resolve or generate a persistent user/client ID
   function getUid() {
     if (firestoreUid) return firestoreUid;
     if (typeof auth !== 'undefined' && auth.currentUser) {
@@ -53,65 +47,116 @@
     return firestoreUid;
   }
 
-  /** Write state back to Firestore (keep last 200 transactions) */
   async function saveState(s) {
-    // Always keep a local cache for instant UI updates
-    try { localStorage.setItem('et_state_cache', JSON.stringify({ balance: s.balance, transactions: s.transactions.slice(-200) })); } catch (_) {}
+    try {
+      localStorage.setItem('et_state_cache', JSON.stringify({
+        balance: s.balance,
+        transactions: s.transactions.slice(-200)
+      }));
+    } catch (_) {}
 
     const uid = getUid();
     if (!uid || typeof db === 'undefined') return;
     try {
       await db.collection('users').doc(uid).set({
         balance:      s.balance,
-        transactions: s.transactions.slice(-200), // keep last 200
+        transactions: s.transactions.slice(-200),
       }, { merge: true });
     } catch (err) {
       console.warn('Firestore write failed:', err.message);
     }
   }
 
-  let currentMarketIdx = 0;
-  let currentDuration  = '1m';
-  let currentPrices    = MARKETS.map(m => m.base);
-  let tradeInProgress  = false;
-  let currentTab       = 'all';
+  /* ── Interactive Trading Controls State ── */
+  let currentMarketIdx    = 0;
+  let currentPrices       = MARKETS.map(m => m.base);
+  let marketHighs         = MARKETS.map(m => parseFloat((m.base + m.base * 0.005).toFixed(2)));
+  let marketLows          = MARKETS.map(m => parseFloat((m.base - m.base * 0.005).toFixed(2)));
+  let selectedBarrier     = 5;
+  let currentTradeMode    = 'manual'; // manual, auto, ai
+  let currentCategory     = 'digits'; // digits, risefall, multipliers
+  let currentDigitSubmode = 'over_under'; // over_under, even_odd, matches_differs
+  let currentDuration     = '1m';
+  let currentStake        = 10;
+  let openPositions       = [];
+  let closedPositions     = [];
+
+  // Chart and Digits series
+  let chartTicks          = [];
+  let lastDigitsHistory   = [];
+
+  // Populate initial realistic history
+  (function initHistory() {
+    const baseP = MARKETS[0].base;
+    for (let i = 0; i < 60; i++) {
+      const p = baseP + Math.sin(i * 0.15) * 2 + ((Math.random() - 0.49) * 1.5);
+      const fixP = parseFloat(p.toFixed(2));
+      chartTicks.push(fixP);
+      lastDigitsHistory.push(parseInt(fixP.toFixed(2).slice(-1)));
+    }
+  })();
 
   /* ══════════════════════════════════════════════════════
-     DOM REFERENCES
+     3. DOM ELEMENTS
   ══════════════════════════════════════════════════════ */
-  const balanceEl     = document.getElementById('dashBalance');
-  const stakeInput    = document.getElementById('stakeInput');
-  const marketSelect  = document.getElementById('marketSelect');
-  const livePriceEl   = document.getElementById('livePrice');
-  const priceChangeEl = document.getElementById('priceChange');
-  const potWinEl      = document.getElementById('potentialWin');
-  const potReturnEl   = document.getElementById('potentialReturn');
-  const stakeLabelEl  = document.getElementById('stakeBalanceLabel');
+  const balanceEl            = document.getElementById('dashBalance');
+  const panelBalanceEl       = document.getElementById('panelAvailableBalance');
+  const livePriceEl          = document.getElementById('livePrice');
+  const priceChangeEl        = document.getElementById('priceChange');
+  const liveLastDigitEl      = document.getElementById('liveLastDigit');
+  const statHighEl           = document.getElementById('statHigh');
+  const statLowEl            = document.getElementById('statLow');
+  const selectedMarketNameEl = document.getElementById('selectedMarketName');
+  const marketDropdownBtn    = document.getElementById('marketDropdownTrigger');
+  const marketMenuEl         = document.getElementById('marketMenu');
+  const digitsGridEl         = document.getElementById('digitsGrid');
+  const stakeInputEl         = document.getElementById('stakeInput');
+  const stakeMinusBtn        = document.getElementById('stakeMinus');
+  const stakePlusBtn         = document.getElementById('stakePlus');
+  const stakeKesConversionEl = document.getElementById('stakeKesConversion');
+  const selectedBarrierBadge = document.getElementById('selectedBarrierBadge');
+  const balanceStatusHint    = document.getElementById('balanceStatusHint');
 
-  // Stats
-  const statBalance  = document.getElementById('statBalance');
-  const statWins     = document.getElementById('statWins');
-  const statLosses   = document.getElementById('statLosses');
-  const statProfit   = document.getElementById('statProfit');
+  // Execution buttons
+  const digitsActionsBox     = document.getElementById('digitsActions');
+  const riseFallActionsBox   = document.getElementById('riseFallActions');
+  const barrierRowEl         = document.getElementById('barrierRow');
+  const durationRowEl        = document.getElementById('durationRow');
+  const digitsSubmodesBox    = document.getElementById('digitsSubmodes');
+  const btnOver              = document.getElementById('btnOver');
+  const btnUnder             = document.getElementById('btnUnder');
+  const lblOver              = document.getElementById('lblOver');
+  const lblUnder             = document.getElementById('lblUnder');
+  const pctOver              = document.getElementById('pctOver');
+  const pctUnder             = document.getElementById('pctUnder');
+  const payoutOver           = document.getElementById('payoutOver');
+  const payoutUnder          = document.getElementById('payoutUnder');
+  const riseBtn              = document.getElementById('riseBtn');
+  const fallBtn              = document.getElementById('fallBtn');
 
-  // History
-  const historyList  = document.getElementById('historyList');
+  // Positions Drawer
+  const tabOpenPositions     = document.getElementById('tabOpenPositions');
+  const tabClosedPositions   = document.getElementById('tabClosedPositions');
+  const openCountEl          = document.getElementById('openCount');
+  const closedCountEl        = document.getElementById('closedCount');
+  const openPositionsEmpty   = document.getElementById('openPositionsEmpty');
+  const openPositionsList    = document.getElementById('openPositionsList');
+  const closedPositionsEmpty = document.getElementById('closedPositionsEmpty');
+  const closedPositionsList  = document.getElementById('closedPositionsList');
 
-  // Buttons
-  const riseBtn   = document.getElementById('riseBtn');
-  const fallBtn   = document.getElementById('fallBtn');
-  const depositBtn  = document.querySelectorAll('[data-open-deposit]');
-  const withdrawBtn = document.querySelectorAll('[data-open-withdraw]');
+  // Canvas
+  const canvas               = document.getElementById('marketChart');
+  const ctx                  = canvas?.getContext('2d');
 
   // Modals
-  const depositModal  = document.getElementById('depositModal');
-  const withdrawModal = document.getElementById('withdrawModal');
-
-  // Result overlay
-  const resultOverlay = document.getElementById('tradeResult');
+  const depositModal         = document.getElementById('depositModal');
+  const withdrawModal        = document.getElementById('withdrawModal');
+  const resultOverlay        = document.getElementById('tradeResult');
+  const depositBtn           = document.querySelectorAll('[data-open-deposit]');
+  const withdrawBtn          = document.querySelectorAll('[data-open-withdraw]');
 
   /* ══════════════════════════════════════════════════════
-     1. BALANCE & UI
+     4. FORMATTERS & UI SYNCS
   ══════════════════════════════════════════════════════ */
   function fmt(n) {
     return '$' + Number(n).toLocaleString('en-US', {
@@ -120,156 +165,591 @@
     });
   }
 
-  function fmtPrice(n) {
-    return Number(n).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  }
-
   function updateBalanceUI(flash) {
     const b = fmt(state.balance);
     if (balanceEl) balanceEl.textContent = b;
-    if (stakeLabelEl) stakeLabelEl.textContent = fmt(state.balance);
-    if (statBalance) statBalance.textContent = b;
-    // sync withdrawal modal balance label
+    if (panelBalanceEl) panelBalanceEl.textContent = b;
     const modalBalanceEl = document.getElementById('modalBalance');
-    if (modalBalanceEl) modalBalanceEl.textContent = fmt(state.balance);
+    if (modalBalanceEl) modalBalanceEl.textContent = b;
 
-    if (flash && balanceEl) {
-      balanceEl.classList.remove('flash-win', 'flash-lose');
-      void balanceEl.offsetWidth; // reflow
-      balanceEl.classList.add(flash === 'win' ? 'flash-win' : 'flash-lose');
-      setTimeout(() => balanceEl.classList.remove('flash-win', 'flash-lose'), 1000);
-    }
-  }
-
-  function updateStats() {
-    const trades  = state.transactions.filter(t => t.type === 'trade');
-    const wins    = trades.filter(t => t.result === 'win');
-    const losses  = trades.filter(t => t.result === 'lose');
-    const profit  = wins.reduce((a, t) => a + t.profit, 0)
-                  - losses.reduce((a, t) => a + Math.abs(t.profit), 0);
-
-    if (statWins)   statWins.textContent   = wins.length;
-    if (statLosses) statLosses.textContent = losses.length;
-    if (statProfit) {
-      statProfit.textContent = fmt(profit);
-      statProfit.className   = 'dash-stat-value ' + (profit >= 0 ? 'positive' : 'negative');
-    }
+    updateExecutionControls();
   }
 
   /* ══════════════════════════════════════════════════════
-     2. PAYOUT PREVIEW
+     5. HIGH-FIDELITY LIVE NEON CANVAS CHART
   ══════════════════════════════════════════════════════ */
-  function updatePayoutPreview() {
-    const stake = parseFloat(stakeInput?.value) || 0;
-    const win   = parseFloat((stake * PAYOUT_RATE).toFixed(2));
-    const total = parseFloat((stake + win).toFixed(2));
-    const previewStakeEl = document.getElementById('previewStake');
-    const potLossEl      = document.getElementById('potentialLoss');
-    if (previewStakeEl)  previewStakeEl.textContent  = fmt(stake);
-    if (potWinEl)        potWinEl.textContent         = '+' + fmt(win);
-    if (potReturnEl)     potReturnEl.textContent      = fmt(total);
-    if (potLossEl)       potLossEl.textContent        = '−' + fmt(stake);
+  function resizeCanvas() {
+    if (!canvas || !canvas.parentElement) return;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    if (ctx) ctx.scale(dpr, dpr);
+    renderChart();
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+
+  function renderChart() {
+    if (!canvas || !ctx || chartTicks.length < 2) return;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Padding
+    const padTop = 30;
+    const padBottom = 40;
+    const padRight = 85;
+    const padLeft = 10;
+    const drawW = w - padLeft - padRight;
+    const drawH = h - padTop - padBottom;
+
+    const minP = Math.min(...chartTicks) - 0.5;
+    const maxP = Math.max(...chartTicks) + 0.5;
+    const range = Math.max(0.1, maxP - minP);
+
+    // Update Y-axis coordinate numbers in DOM
+    const yMaxEl = document.getElementById('yLevelMax');
+    const yMidHighEl = document.getElementById('yLevelMidHigh');
+    const yCurrentEl = document.getElementById('yLevelCurrent');
+    const yMidLowEl = document.getElementById('yLevelMidLow');
+    const yMinEl = document.getElementById('yLevelMin');
+    const currP = chartTicks[chartTicks.length - 1];
+
+    if (yMaxEl) yMaxEl.textContent = maxP.toFixed(2);
+    if (yMidHighEl) yMidHighEl.textContent = (minP + range * 0.75).toFixed(2);
+    if (yCurrentEl) yCurrentEl.textContent = currP.toFixed(2);
+    if (yMidLowEl) yMidLowEl.textContent = (minP + range * 0.25).toFixed(2);
+    if (yMinEl) yMinEl.textContent = minP.toFixed(2);
+
+    // Draw grid lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padTop + (drawH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(padLeft, y);
+      ctx.lineTo(w - padRight, y);
+      ctx.stroke();
+    }
+
+    // Points mapping
+    const points = chartTicks.map((p, i) => {
+      const x = padLeft + (i / (chartTicks.length - 1)) * drawW;
+      const y = padTop + drawH - ((p - minP) / range) * drawH;
+      return { x, y };
+    });
+
+    // 1. Draw glowing gradient area fill under the line
+    const grad = ctx.createLinearGradient(0, padTop, 0, padTop + drawH);
+    grad.addColorStop(0, 'rgba(0, 240, 144, 0.28)');
+    grad.addColorStop(0.7, 'rgba(0, 240, 144, 0.04)');
+    grad.addColorStop(1, 'rgba(0, 240, 144, 0)');
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      const xc = (points[i].x + points[i - 1].x) / 2;
+      const yc = (points[i].y + points[i - 1].y) / 2;
+      ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, xc, yc);
+    }
+    const lastPt = points[points.length - 1];
+    ctx.lineTo(lastPt.x, lastPt.y);
+    ctx.lineTo(lastPt.x, padTop + drawH);
+    ctx.lineTo(points[0].x, padTop + drawH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // 2. Draw neon glowing line
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      const xc = (points[i].x + points[i - 1].x) / 2;
+      const yc = (points[i].y + points[i - 1].y) / 2;
+      ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, xc, yc);
+    }
+    ctx.lineTo(lastPt.x, lastPt.y);
+    ctx.strokeStyle = '#00f090';
+    ctx.lineWidth = 2.4;
+    ctx.shadowColor = '#00f090';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.restore();
+
+    // 3. Draw dashed price target line to right axis
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(0, 240, 144, 0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(lastPt.x, lastPt.y);
+    ctx.lineTo(w - padRight, lastPt.y);
+    ctx.stroke();
+    ctx.restore();
+
+    // 4. Pulsing head dot
+    ctx.beginPath();
+    ctx.arc(lastPt.x, lastPt.y, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(lastPt.x, lastPt.y, 9, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 240, 144, 0.4)';
+    ctx.fill();
   }
 
   /* ══════════════════════════════════════════════════════
-     3. LIVE PRICE ENGINE
+     6. LIVE PRICE TICK & DIGITS STREAM
   ══════════════════════════════════════════════════════ */
-  function tickPrice(idx) {
-    const m   = MARKETS[idx];
-    const old = currentPrices[idx];
-    const chg = (Math.random() - 0.49) * m.base * m.vol;
-    currentPrices[idx] = parseFloat((old + chg).toFixed(2));
-    return { old, current: currentPrices[idx] };
-  }
+  function tickEngine() {
+    const m = MARKETS[currentMarketIdx];
+    const old = currentPrices[currentMarketIdx];
+    const delta = (Math.random() - 0.49) * m.base * m.vol;
+    const nextP = parseFloat((old + delta).toFixed(2));
+    currentPrices[currentMarketIdx] = nextP;
 
-  function refreshLivePrice() {
-    const { old, current } = tickPrice(currentMarketIdx);
-    const isUp = current >= old;
-    const diff = ((current - MARKETS[currentMarketIdx].base) / MARKETS[currentMarketIdx].base * 100).toFixed(3);
+    // Track High and Low
+    if (nextP > marketHighs[currentMarketIdx]) marketHighs[currentMarketIdx] = nextP;
+    if (nextP < marketLows[currentMarketIdx]) marketLows[currentMarketIdx] = nextP;
 
-    if (livePriceEl) {
-      livePriceEl.textContent = fmtPrice(current);
-      livePriceEl.classList.remove('tick-up', 'tick-down');
-      void livePriceEl.offsetWidth;
-      livePriceEl.classList.add(isUp ? 'tick-up' : 'tick-down');
-      setTimeout(() => livePriceEl.classList.remove('tick-up', 'tick-down'), 400);
-    }
+    // Last Digit
+    const lastDigit = parseInt(nextP.toFixed(2).slice(-1));
+    lastDigitsHistory.push(lastDigit);
+    if (lastDigitsHistory.length > 100) lastDigitsHistory.shift();
 
+    // Add to chart series
+    chartTicks.push(nextP);
+    if (chartTicks.length > 70) chartTicks.shift();
+
+    // Update Header UI
+    if (livePriceEl) livePriceEl.textContent = nextP.toFixed(2);
+    if (liveLastDigitEl) liveLastDigitEl.textContent = lastDigit;
+    if (statHighEl) statHighEl.textContent = marketHighs[currentMarketIdx].toFixed(2);
+    if (statLowEl) statLowEl.textContent = marketLows[currentMarketIdx].toFixed(2);
+
+    const diffPct = (((nextP - m.base) / m.base) * 100).toFixed(2);
     if (priceChangeEl) {
-      priceChangeEl.textContent = (diff >= 0 ? '+' : '') + diff + '%';
-      priceChangeEl.className   = 'live-price-change ' + (diff >= 0 ? 'up' : 'down');
+      const isUp = Number(diffPct) >= 0;
+      priceChangeEl.textContent = (isUp ? '▲ +' : '▼ ') + diffPct + '%';
+      priceChangeEl.className = 'st-price-delta ' + (isUp ? 'up' : 'down');
+    }
+
+    renderChart();
+    renderDigitsBar(lastDigit);
+    stepOpenPositions(nextP, lastDigit);
+  }
+
+  setInterval(tickEngine, 1000);
+
+  /* ══════════════════════════════════════════════════════
+     7. LIVE LAST DIGITS ANALYSIS BAR
+  ══════════════════════════════════════════════════════ */
+  function renderDigitsBar(activeDigit) {
+    if (!digitsGridEl) return;
+
+    // Calculate percentage frequency for digits 0 - 9
+    const counts = Array(10).fill(0);
+    lastDigitsHistory.forEach(d => counts[d]++);
+    const total = Math.max(1, lastDigitsHistory.length);
+
+    let html = '';
+    for (let i = 0; i <= 9; i++) {
+      const pct = Math.round((counts[i] / total) * 100);
+      const isCurr = (i === activeDigit) ? 'is-current' : '';
+      const isSelected = (i === selectedBarrier) ? 'selected-barrier' : '';
+
+      html += `
+        <div class="st-digit-card ${isCurr} ${isSelected}" data-digit="${i}" title="Set barrier to ${i}">
+          <div class="st-digit-circle">${i}</div>
+          <span class="st-digit-pct">${pct}%</span>
+        </div>
+      `;
+    }
+
+    digitsGridEl.innerHTML = html;
+
+    // Attach click listeners to set barrier directly
+    digitsGridEl.querySelectorAll('.st-digit-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const digit = parseInt(card.dataset.digit);
+        selectedBarrier = digit;
+        if (selectedBarrierBadge) selectedBarrierBadge.textContent = digit;
+        renderDigitsBar(activeDigit);
+        updateExecutionControls();
+      });
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════
+     8. MARKET DROPDOWN SELECTOR
+  ══════════════════════════════════════════════════════ */
+  if (marketDropdownBtn && marketMenuEl) {
+    marketDropdownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      marketMenuEl.style.display = (marketMenuEl.style.display === 'none') ? 'block' : 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!marketMenuEl.contains(e.target) && e.target !== marketDropdownBtn) {
+        marketMenuEl.style.display = 'none';
+      }
+    });
+
+    marketMenuEl.querySelectorAll('.st-market-opt').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        marketMenuEl.querySelectorAll('.st-market-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        marketMenuEl.style.display = 'none';
+
+        currentMarketIdx = idx;
+        const m = MARKETS[idx];
+        if (selectedMarketNameEl) selectedMarketNameEl.textContent = m.name;
+
+        // Reset series for new market
+        chartTicks = [];
+        for (let i = 0; i < 50; i++) {
+          chartTicks.push(parseFloat((m.base + (Math.random() - 0.49) * 2).toFixed(2)));
+        }
+        renderChart();
+        updateExecutionControls();
+      });
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════
+     9. TRADING CONTROLS & DYNAMIC PAYOUTS
+  ══════════════════════════════════════════════════════ */
+  // Mode switcher: Manual / Auto / AI
+  document.querySelectorAll('.st-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.st-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTradeMode = btn.dataset.mode;
+      if (currentTradeMode === 'ai') {
+        showToast('AI Market Analysis mode engaged.', 'info');
+      }
+    });
+  });
+
+  // Category switcher: Rise/Fall | Digits | Multipliers
+  document.querySelectorAll('.st-cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.st-cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentCategory = btn.dataset.category;
+
+      if (currentCategory === 'risefall') {
+        if (digitsActionsBox) digitsActionsBox.style.display = 'none';
+        if (riseFallActionsBox) riseFallActionsBox.style.display = 'grid';
+        if (barrierRowEl) barrierRowEl.style.display = 'none';
+        if (durationRowEl) durationRowEl.style.display = 'flex';
+        if (digitsSubmodesBox) digitsSubmodesBox.style.display = 'none';
+      } else {
+        if (digitsActionsBox) digitsActionsBox.style.display = 'grid';
+        if (riseFallActionsBox) riseFallActionsBox.style.display = 'none';
+        if (barrierRowEl) barrierRowEl.style.display = 'flex';
+        if (durationRowEl) durationRowEl.style.display = 'none';
+        if (digitsSubmodesBox) digitsSubmodesBox.style.display = 'grid';
+      }
+
+      updateExecutionControls();
+    });
+  });
+
+  // Digits submodes: Over/Under | Even/Odd | Matches/Differs
+  document.querySelectorAll('.st-submode-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.st-submode-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentDigitSubmode = pill.dataset.digitMode;
+      updateExecutionControls();
+    });
+  });
+
+  // Duration pills for Rise/Fall
+  document.querySelectorAll('.st-dur-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.st-dur-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentDuration = pill.dataset.dur;
+    });
+  });
+
+  // Stake input & Steppers
+  function setStake(amount) {
+    currentStake = Math.max(MIN_STAKE, parseFloat(Number(amount).toFixed(2)));
+    if (stakeInputEl) stakeInputEl.value = currentStake;
+    updateExecutionControls();
+  }
+
+  if (stakeMinusBtn) stakeMinusBtn.addEventListener('click', () => setStake(currentStake - 1));
+  if (stakePlusBtn) stakePlusBtn.addEventListener('click', () => setStake(currentStake + 1));
+  if (stakeInputEl) {
+    stakeInputEl.addEventListener('input', (e) => setStake(parseFloat(e.target.value) || 0));
+  }
+
+  // Quick Chips
+  document.querySelectorAll('.st-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.st-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      setStake(parseFloat(chip.dataset.stake));
+    });
+  });
+
+  function updateExecutionControls() {
+    // 1. KES Conversion
+    const kes = Math.round(currentStake * KES_RATE);
+    if (stakeKesConversionEl) {
+      stakeKesConversionEl.textContent = `~ KES ${kes.toLocaleString()}`;
+    }
+
+    // 2. Digits Payout Calculation (SinTrades matching formula)
+    const B = selectedBarrier;
+    const overWinningDigits  = Math.max(1, 9 - B);
+    const underWinningDigits = Math.max(1, B);
+
+    // Dynamic Payouts matching SinTrades reference (Barrier 5 -> +138% Over / +90% Under)
+    const overPctVal  = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
+    const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
+
+    const payoutOverVal  = (currentStake * (1 + overPctVal / 100)).toFixed(2);
+    const payoutUnderVal = (currentStake * (1 + underPctVal / 100)).toFixed(2);
+
+    if (lblOver) lblOver.textContent = `OVER ${B}`;
+    if (pctOver) pctOver.textContent = `+${overPctVal}%`;
+    if (payoutOver) payoutOver.textContent = `Payout $${payoutOverVal}`;
+
+    if (lblUnder) lblUnder.textContent = `UNDER ${B}`;
+    if (pctUnder) pctUnder.textContent = `+${underPctVal}%`;
+    if (payoutUnder) payoutUnder.textContent = `Payout $${payoutUnderVal}`;
+
+    // Rise/Fall Payouts
+    const risePayoutVal = (currentStake * 1.95).toFixed(2);
+    const payoutRiseEl = document.getElementById('payoutRise');
+    const payoutFallEl = document.getElementById('payoutFall');
+    if (payoutRiseEl) payoutRiseEl.textContent = `Payout $${risePayoutVal}`;
+    if (payoutFallEl) payoutFallEl.textContent = `Payout $${risePayoutVal}`;
+
+    // 3. Balance verification hint
+    if (balanceStatusHint) {
+      if (currentStake > state.balance) {
+        balanceStatusHint.style.display = 'block';
+      } else {
+        balanceStatusHint.style.display = 'none';
+      }
     }
   }
 
-  setInterval(refreshLivePrice, 900);
-
   /* ══════════════════════════════════════════════════════
-     4. MARKET SELECTOR
+     10. EXECUTION & POSITIONS DRAWER
   ══════════════════════════════════════════════════════ */
-  if (marketSelect) {
-    MARKETS.forEach((m, i) => {
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = m.name + ' (' + m.symbol + ')';
-      marketSelect.appendChild(opt);
-    });
+  function placeContract(type, title, winCondition, profitVal) {
+    if (currentStake > state.balance) {
+      showToast('Insufficient balance. Please deposit funds.', 'error');
+      openModal(depositModal);
+      return;
+    }
 
-    marketSelect.addEventListener('change', () => {
-      currentMarketIdx = parseInt(marketSelect.value);
-      if (livePriceEl) livePriceEl.textContent = fmtPrice(currentPrices[currentMarketIdx]);
-    });
+    // Deduct stake
+    state.balance = parseFloat((state.balance - currentStake).toFixed(2));
+    updateBalanceUI('lose');
+
+    const m = MARKETS[currentMarketIdx];
+    const pos = {
+      id: 'POS-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+      market: m.symbol,
+      type: title,
+      stake: currentStake,
+      profit: parseFloat(profitVal),
+      entrySpot: currentPrices[currentMarketIdx],
+      entryDigit: parseInt(currentPrices[currentMarketIdx].toFixed(2).slice(-1)),
+      winCondition: winCondition,
+      ticksRemaining: 5,
+      createdAt: Date.now(),
+    };
+
+    openPositions.push(pos);
+    renderPositions();
+    showToast(`${title} contract placed on ${m.symbol}!`, 'info');
   }
 
-  /* ══════════════════════════════════════════════════════
-     5. DURATION PILLS
-  ══════════════════════════════════════════════════════ */
-  document.querySelectorAll('.duration-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      document.querySelectorAll('.duration-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      currentDuration = pill.dataset.duration;
-    });
-  });
+  function stepOpenPositions(currPrice, currDigit) {
+    if (openPositions.length === 0) return;
 
-  /* ══════════════════════════════════════════════════════
-     6. STAKE QUICK BUTTONS
-  ══════════════════════════════════════════════════════ */
-  document.querySelectorAll('.stake-quick').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!stakeInput) return;
-      const val = btn.dataset.value;
-      if (val === 'all') {
-        stakeInput.value = Math.max(0, state.balance).toFixed(2);
-      } else {
-        stakeInput.value = (parseFloat(stakeInput.value || 0) + parseFloat(val)).toFixed(2);
+    for (let i = openPositions.length - 1; i >= 0; i--) {
+      const pos = openPositions[i];
+      pos.ticksRemaining--;
+
+      if (pos.ticksRemaining <= 0) {
+        // Contract settled
+        const won = pos.winCondition(currPrice, currDigit);
+        openPositions.splice(i, 1);
+
+        if (won) {
+          const payout = pos.stake + pos.profit;
+          state.balance = parseFloat((state.balance + payout).toFixed(2));
+          updateBalanceUI('win');
+          showResultOverlay(true, pos.stake, pos.profit, state.balance);
+        } else {
+          showResultOverlay(false, pos.stake, pos.profit, state.balance);
+          updateBalanceUI('lose');
+        }
+
+        // Add to closed positions
+        closedPositions.unshift({
+          ...pos,
+          result: won ? 'win' : 'lose',
+          closedPrice: currPrice,
+          closedDigit: currDigit,
+          closedAt: Date.now()
+        });
+
+        // Record in transactions
+        state.transactions.push({
+          type: 'trade',
+          market: pos.market,
+          direction: pos.type,
+          stake: pos.stake,
+          profit: won ? pos.profit : -pos.stake,
+          result: won ? 'win' : 'lose',
+          ts: Date.now()
+        });
+
+        saveState(state);
       }
-      updatePayoutPreview();
-    });
-  });
+    }
 
-  if (stakeInput) {
-    stakeInput.addEventListener('input', updatePayoutPreview);
+    renderPositions();
+  }
+
+  function renderPositions() {
+    if (openCountEl) openCountEl.textContent = openPositions.length;
+    if (closedCountEl) closedCountEl.textContent = closedPositions.length;
+
+    // Open positions
+    if (openPositions.length === 0) {
+      if (openPositionsEmpty) openPositionsEmpty.style.display = 'block';
+      if (openPositionsList) openPositionsList.style.display = 'none';
+    } else {
+      if (openPositionsEmpty) openPositionsEmpty.style.display = 'none';
+      if (openPositionsList) {
+        openPositionsList.style.display = 'block';
+        openPositionsList.innerHTML = openPositions.map(p => `
+          <div class="st-position-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;font-weight:700;">
+              <span>${p.type}</span>
+              <span style="color:#a78bfa;">${p.ticksRemaining} ticks</span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--st-text-dim);margin-top:4px;">
+              ${p.market} &bull; Stake: ${fmt(p.stake)}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Closed positions
+    if (closedPositions.length === 0) {
+      if (closedPositionsEmpty) closedPositionsEmpty.style.display = 'block';
+      if (closedPositionsList) closedPositionsList.style.display = 'none';
+    } else {
+      if (closedPositionsEmpty) closedPositionsEmpty.style.display = 'none';
+      if (closedPositionsList) {
+        closedPositionsList.style.display = 'block';
+        closedPositionsList.innerHTML = closedPositions.slice(0, 15).map(p => `
+          <div class="st-position-card ${p.result}">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;font-weight:700;">
+              <span>${p.type}</span>
+              <span style="color:${p.result === 'win' ? 'var(--st-neon-green)' : 'var(--st-red)'};">
+                ${p.result === 'win' ? '+' + fmt(p.profit) : '−' + fmt(p.stake)}
+              </span>
+            </div>
+            <div style="font-size:0.74rem;color:var(--st-text-dim);margin-top:4px;">
+              ${p.market} &bull; Final Digit: ${p.closedDigit}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+  }
+
+  // Position tabs toggling
+  if (tabOpenPositions && tabClosedPositions) {
+    tabOpenPositions.addEventListener('click', () => {
+      tabOpenPositions.classList.add('active');
+      tabClosedPositions.classList.remove('active');
+      if (openPositionsList) openPositionsList.style.display = openPositions.length ? 'block' : 'none';
+      if (openPositionsEmpty) openPositionsEmpty.style.display = openPositions.length ? 'none' : 'block';
+      if (closedPositionsList) closedPositionsList.style.display = 'none';
+      if (closedPositionsEmpty) closedPositionsEmpty.style.display = 'none';
+    });
+
+    tabClosedPositions.addEventListener('click', () => {
+      tabClosedPositions.classList.add('active');
+      tabOpenPositions.classList.remove('active');
+      if (openPositionsList) openPositionsList.style.display = 'none';
+      if (openPositionsEmpty) openPositionsEmpty.style.display = 'none';
+      if (closedPositionsList) closedPositionsList.style.display = closedPositions.length ? 'block' : 'none';
+      if (closedPositionsEmpty) closedPositionsEmpty.style.display = closedPositions.length ? 'none' : 'block';
+    });
+  }
+
+  // Execution Listeners
+  if (btnOver) {
+    btnOver.addEventListener('click', () => {
+      const B = selectedBarrier;
+      const overWinningDigits = Math.max(1, 9 - B);
+      const overPctVal = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
+      const profit = (currentStake * (overPctVal / 100)).toFixed(2);
+      placeContract('OVER', `OVER ${B}`, (p, digit) => digit > B, profit);
+    });
+  }
+
+  if (btnUnder) {
+    btnUnder.addEventListener('click', () => {
+      const B = selectedBarrier;
+      const underWinningDigits = Math.max(1, B);
+      const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
+      const profit = (currentStake * (underPctVal / 100)).toFixed(2);
+      placeContract('UNDER', `UNDER ${B}`, (p, digit) => digit < B, profit);
+    });
+  }
+
+  if (riseBtn) {
+    riseBtn.addEventListener('click', () => {
+      const entrySpot = currentPrices[currentMarketIdx];
+      const profit = (currentStake * 0.95).toFixed(2);
+      placeContract('RISE', 'RISE', (exitP) => exitP > entrySpot, profit);
+    });
+  }
+
+  if (fallBtn) {
+    fallBtn.addEventListener('click', () => {
+      const entrySpot = currentPrices[currentMarketIdx];
+      const profit = (currentStake * 0.95).toFixed(2);
+      placeContract('FALL', 'FALL', (exitP) => exitP < entrySpot, profit);
+    });
   }
 
   /* ══════════════════════════════════════════════════════
-     7. TOAST NOTIFICATIONS
+     11. TOAST & TRADE RESULT OVERLAY
   ══════════════════════════════════════════════════════ */
   const toastContainer = document.getElementById('toastContainer');
 
   function showToast(msg, type = 'info') {
     if (!toastContainer) return;
     const icons = {
-      success: '<i data-lucide="check-circle-2" class="lucide-sm" style="color:var(--positive);"></i>',
-      error:   '<i data-lucide="alert-circle" class="lucide-sm" style="color:var(--negative);"></i>',
-      info:    '<i data-lucide="info" class="lucide-sm" style="color:var(--accent);"></i>',
-      win:     '<i data-lucide="award" class="lucide-sm" style="color:var(--positive);"></i>',
-      lose:    '<i data-lucide="trending-down" class="lucide-sm" style="color:var(--negative);"></i>'
+      success: '<i data-lucide="check-circle-2" class="lucide-sm" style="color:var(--st-neon-green);"></i>',
+      error:   '<i data-lucide="alert-circle" class="lucide-sm" style="color:var(--st-red);"></i>',
+      info:    '<i data-lucide="info" class="lucide-sm" style="color:#a78bfa;"></i>',
     };
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type === 'win' || type === 'success' ? 'success' : type === 'lose' || type === 'error' ? 'error' : 'info'}`;
+    toast.className = `toast toast-${type === 'success' ? 'success' : type === 'error' ? 'error' : 'info'}`;
     toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span class="toast-text">${msg}</span>`;
     toastContainer.appendChild(toast);
     if (window.lucide) lucide.createIcons();
@@ -277,174 +757,7 @@
   }
 
   /* ══════════════════════════════════════════════════════
-     8. TRANSACTION HISTORY RENDERER
-  ══════════════════════════════════════════════════════ */
-  function timeAgo(ts) {
-    const secs = Math.floor((Date.now() - ts) / 1000);
-    if (secs < 60)   return 'Just now';
-    if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
-    if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
-    return new Date(ts).toLocaleDateString();
-  }
-
-  function renderHistory() {
-    if (!historyList) return;
-
-    const txns = state.transactions.filter(t => {
-      if (currentTab === 'all')      return true;
-      if (currentTab === 'trades')   return t.type === 'trade';
-      if (currentTab === 'deposits') return t.type === 'deposit';
-      if (currentTab === 'withdrawals') return t.type === 'withdraw';
-      return true;
-    }).slice().reverse(); // newest first
-
-    if (txns.length === 0) {
-      historyList.innerHTML = `
-        <div class="history-empty">
-          <div class="empty-icon"><i data-lucide="clipboard-list" class="lucide-lg" style="color:var(--text-muted);"></i></div>
-          <p>No transactions yet.<br>Make a deposit to start trading.</p>
-        </div>`;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
-    historyList.innerHTML = txns.map(t => {
-      if (t.type === 'deposit') {
-        return `
-          <div class="history-item">
-            <div class="history-icon deposit"><i data-lucide="arrow-down-left" class="lucide-sm"></i></div>
-            <div class="history-info">
-              <h4>Deposit - ${t.method}</h4>
-              <span>${timeAgo(t.ts)}</span>
-            </div>
-            <div class="history-amount positive">+${fmt(t.amount)}</div>
-          </div>`;
-      }
-
-      if (t.type === 'withdraw') {
-        return `
-          <div class="history-item">
-            <div class="history-icon withdraw"><i data-lucide="arrow-up-right" class="lucide-sm"></i></div>
-            <div class="history-info">
-              <h4>Withdrawal - ${t.method}</h4>
-              <span>${timeAgo(t.ts)} · ${t.status === 'pending' ? '<span style="color:var(--warning)">Pending</span>' : 'Completed'}</span>
-            </div>
-            <div class="history-amount negative">−${fmt(t.amount)}</div>
-          </div>`;
-      }
-
-      if (t.type === 'trade') {
-        const isWin = t.result === 'win';
-        return `
-          <div class="history-item">
-            <div class="history-icon ${isWin ? 'win' : 'lose'}">
-              <i data-lucide="${isWin ? 'trending-up' : 'trending-down'}" class="lucide-sm"></i>
-            </div>
-            <div class="history-info">
-              <h4>${t.direction} - ${t.market} (${t.duration})</h4>
-              <span>${timeAgo(t.ts)} · Stake: ${fmt(t.stake)}</span>
-            </div>
-            <div class="history-amount ${isWin ? 'positive' : 'negative'}">
-              ${isWin ? '+' + fmt(t.profit) : '−' + fmt(t.stake)}
-            </div>
-          </div>`;
-      }
-
-      return '';
-    }).join('');
-
-    if (window.lucide) lucide.createIcons();
-  }
-
-  // Tab switching
-  document.querySelectorAll('.history-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.history-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      currentTab = tab.dataset.tab;
-      renderHistory();
-    });
-  });
-
-  /* ══════════════════════════════════════════════════════
-     9. TRADE ENGINE
-  ══════════════════════════════════════════════════════ */
-  function executeTrade(direction) {
-    if (tradeInProgress) return;
-
-    const stake = parseFloat(stakeInput?.value);
-
-    if (isNaN(stake) || stake < MIN_STAKE) {
-      showToast(`Minimum stake is ${fmt(MIN_STAKE)}`, 'error');
-      return;
-    }
-
-    if (stake > state.balance) {
-      showToast('Insufficient balance. Please deposit first.', 'error');
-      return;
-    }
-
-    tradeInProgress = true;
-    if (riseBtn) riseBtn.disabled = true;
-    if (fallBtn) fallBtn.disabled = true;
-
-    // Deduct stake immediately
-    state.balance = parseFloat((state.balance - stake).toFixed(2));
-    updateBalanceUI();
-    saveState(state);
-
-    const market   = MARKETS[currentMarketIdx];
-    const duration = currentDuration;
-
-    // Show "waiting" for contract duration
-    showToast(`${direction} contract on ${market.symbol} (${duration}) started`, 'info');
-
-    // Duration map → ms
-    const durMs = { '15s': 3000, '30s': 5000, '1m': 7000, '2m': 9000, '5m': 12000 };
-    const wait  = durMs[duration] || 5000;
-
-    setTimeout(() => {
-      const won    = Math.random() < WIN_CHANCE;
-      const profit = parseFloat((stake * PAYOUT_RATE).toFixed(2));
-
-      if (won) {
-        const payout = stake + profit;
-        state.balance = parseFloat((state.balance + payout).toFixed(2));
-        updateBalanceUI('win');
-        showResultOverlay(true, stake, profit, state.balance);
-      } else {
-        // Already deducted, show result
-        showResultOverlay(false, stake, profit, state.balance);
-        updateBalanceUI('lose');
-      }
-
-      // Record transaction
-      state.transactions.push({
-        type: 'trade',
-        market: market.symbol,
-        direction,
-        stake,
-        profit: won ? profit : -stake,
-        result: won ? 'win' : 'lose',
-        duration,
-        ts: Date.now(),
-      });
-
-      saveState(state);
-      updateStats();
-      renderHistory();
-
-      tradeInProgress = false;
-      if (riseBtn) riseBtn.disabled = false;
-      if (fallBtn) fallBtn.disabled = false;
-    }, wait);
-  }
-
-  if (riseBtn) riseBtn.addEventListener('click', () => executeTrade('Rise'));
-  if (fallBtn) fallBtn.addEventListener('click', () => executeTrade('Fall'));
-
-  /* ══════════════════════════════════════════════════════
-     10. TRADE RESULT OVERLAY
+     12. TRADE RESULT OVERLAY
   ══════════════════════════════════════════════════════ */
   function showResultOverlay(won, stake, profit, newBalance) {
     if (!resultOverlay) return;
@@ -565,8 +878,6 @@
   /* ════════════════════════════════════════════════════════════
      11b. DEPOSIT METHOD PANELS: show/hide based on selection
   ════════════════════════════════════════════════════════════ */
-  const KES_RATE = 130;
-
   function showDepositPanel(method) {
     ['mpesa', 'paypal', 'usdt'].forEach(m => {
       const el = document.getElementById('panel-' + m);
@@ -925,26 +1236,29 @@
      14. INITIALISE & AUTH
   ══════════════════════════════════════════════════════ */
   updateBalanceUI();
-  updateStats();
-  updatePayoutPreview();
-  renderHistory();
-
-  // Initial price display
-  if (livePriceEl) livePriceEl.textContent = fmtPrice(currentPrices[0]);
-
-  // Initialise Lucide icons
-  if (window.lucide) {
-    lucide.createIcons();
-  }
+  updateExecutionControls();
 
   // Load cached state if available
   try {
     const cached = JSON.parse(localStorage.getItem('et_state_cache') || '{}');
     if (typeof cached.balance === 'number') state.balance = cached.balance;
-    if (Array.isArray(cached.transactions)) state.transactions = cached.transactions;
+    if (Array.isArray(cached.transactions)) {
+      state.transactions = cached.transactions;
+      closedPositions = cached.transactions
+        .filter(t => t.type === 'trade')
+        .map(t => ({
+          id: 'POS-' + (t.ts || Date.now()).toString(36).toUpperCase(),
+          type: t.direction || 'Trade',
+          market: t.market || 'V100 (1s)',
+          stake: t.stake || 0,
+          profit: t.profit || 0,
+          result: t.result || (t.profit > 0 ? 'win' : 'lose'),
+          closedDigit: t.closedDigit !== undefined ? t.closedDigit : '-',
+          closedAt: t.ts || Date.now()
+        }));
+      renderPositions();
+    }
     updateBalanceUI();
-    updateStats();
-    renderHistory();
   } catch (_) {}
 
   // Hook Firebase Auth listener
@@ -966,8 +1280,21 @@
               if (Array.isArray(d.transactions)) state.transactions = d.transactions;
 
               updateBalanceUI();
-              updateStats();
-              renderHistory();
+              if (Array.isArray(d.transactions)) {
+                closedPositions = d.transactions
+                  .filter(t => t.type === 'trade')
+                  .map(t => ({
+                    id: 'POS-' + (t.ts || Date.now()).toString(36).toUpperCase(),
+                    type: t.direction || 'Trade',
+                    market: t.market || 'V100 (1s)',
+                    stake: t.stake || 0,
+                    profit: t.profit || 0,
+                    result: t.result || (t.profit > 0 ? 'win' : 'lose'),
+                    closedDigit: t.closedDigit !== undefined ? t.closedDigit : '-',
+                    closedAt: t.ts || Date.now()
+                  }));
+                renderPositions();
+              }
               const greetEl = document.getElementById('userGreeting');
               if (greetEl) greetEl.textContent = 'Hello, ' + state.user.name;
             }
@@ -991,6 +1318,14 @@
       window.location.href = 'login.html';
     });
   });
+
+  // Initial Boot Calls
+  resizeCanvas();
+  renderDigitsBar(parseInt(currentPrices[currentMarketIdx].toFixed(2).slice(-1)));
+  updateExecutionControls();
+  renderPositions();
+  updateBalanceUI();
+  if (window.lucide) lucide.createIcons();
 
   // Show onboarding toast if balance is 0
   if (state.balance === 0) {
