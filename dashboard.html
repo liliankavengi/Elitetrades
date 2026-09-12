@@ -52,18 +52,58 @@
     </div>
 
     <div class="st-header-right">
-      <!-- Live Account Badge -->
-      <div class="st-account-badge">
+      <!-- Account Type Switcher Tabs (Real / Demo $10k) -->
+      <div class="st-account-tabs" id="accountTabs" role="tablist" aria-label="Account Mode">
+        <button type="button" class="st-acc-tab active" data-switch-acc="real" id="tabRealAcc">
+          <span class="st-tab-dot live-dot"></span>
+          <span>Real</span>
+        </button>
+        <button type="button" class="st-acc-tab" data-switch-acc="demo" id="tabDemoAcc">
+          <span class="st-tab-dot demo-dot"></span>
+          <span>Demo ($10K)</span>
+        </button>
+      </div>
+
+      <!-- Live / Demo Account Badge -->
+      <div class="st-account-badge" id="headerAccountBadge">
         <span class="st-live-dot"></span>
         <span class="st-account-text">LIVE ACCOUNT</span>
         <span class="st-account-id" id="accountBadgeId">ET-375286</span>
       </div>
 
-      <!-- Real Balance Pill -->
-      <div class="st-balance-pill" id="headerBalancePill" data-open-deposit title="Click to deposit funds">
-        <span class="st-balance-type">REAL</span>
-        <span class="st-balance-value" id="dashBalance">$0.00</span>
-        <i data-lucide="chevron-down" class="lucide-xs"></i>
+      <!-- Account Balance Pill & Dropdown Wrap -->
+      <div class="st-account-pill-wrap">
+        <div class="st-balance-pill" id="headerBalancePill" title="Switch account / view balances">
+          <span class="st-balance-type">REAL</span>
+          <span class="st-balance-value" id="dashBalance">$1.00</span>
+          <i data-lucide="chevron-down" class="lucide-xs"></i>
+        </div>
+
+        <!-- Account Switcher Dropdown Popover -->
+        <div class="st-account-dropdown" id="accountDropdown" style="display:none;">
+          <div class="st-acc-card real active" id="accCardReal" data-switch-acc="real">
+            <div class="st-acc-card-top">
+              <span class="st-acc-badge real"><span class="st-tab-dot live-dot"></span> Real Account</span>
+              <span class="st-acc-id" id="dropRealId">ET-375286</span>
+            </div>
+            <div class="st-acc-card-bal" id="dropRealBal">$1.00</div>
+            <div class="st-acc-card-actions">
+              <button type="button" class="btn btn-primary btn-xs" data-open-deposit>Deposit</button>
+              <button type="button" class="btn btn-ghost btn-xs" data-open-withdraw>Withdraw</button>
+            </div>
+          </div>
+
+          <div class="st-acc-card demo" id="accCardDemo" data-switch-acc="demo">
+            <div class="st-acc-card-top">
+              <span class="st-acc-badge demo"><span class="st-tab-dot demo-dot"></span> Demo Account</span>
+              <span class="st-acc-id">ET-DEMO-10K</span>
+            </div>
+            <div class="st-acc-card-bal" id="dropDemoBal">$10,000.00</div>
+            <div class="st-acc-card-actions">
+              <button type="button" class="btn btn-outline btn-xs" id="btnResetDemoDropdown">Reset $10K</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Withdraw Button (Purple rounded) -->
@@ -256,25 +296,27 @@
               class="st-stepper-input"
               type="number"
               id="stakeInput"
-              value="10"
+              value="1"
               min="0.35"
-              step="1"
+              step="0.05"
               aria-label="Stake amount"
             />
             <button class="st-step-btn" id="stakePlus" aria-label="Increase stake">&plus;</button>
           </div>
 
           <div class="st-kes-conversion" id="stakeKesConversion">
-            &sim; KES 1,300
+            &sim; KES 130
           </div>
 
-          <!-- Quick Chips: 1, 5, 10, 25, 50, 100 -->
+          <!-- Quick Chips: 0.35, 0.5, 1, 2, 5, 10, 25, 100 -->
           <div class="st-quick-chips">
-            <button class="st-chip" data-stake="1">1</button>
+            <button class="st-chip" data-stake="0.35">0.35</button>
+            <button class="st-chip" data-stake="0.5">0.5</button>
+            <button class="st-chip active" data-stake="1">1</button>
+            <button class="st-chip" data-stake="2">2</button>
             <button class="st-chip" data-stake="5">5</button>
-            <button class="st-chip active" data-stake="10">10</button>
+            <button class="st-chip" data-stake="10">10</button>
             <button class="st-chip" data-stake="25">25</button>
-            <button class="st-chip" data-stake="50">50</button>
             <button class="st-chip" data-stake="100">100</button>
           </div>
         </div>

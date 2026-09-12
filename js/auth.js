@@ -80,6 +80,7 @@
           phone,
           country,
           balance:      0,
+          demo_balance: 10000.00,
           transactions: [],
           createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
         });
@@ -91,6 +92,7 @@
         localStorage.setItem('et_user_phone', phone);
         localStorage.setItem('et_state_cache', JSON.stringify({
           balance: 0,
+          demo_balance: 10000.00,
           transactions: []
         }));
 

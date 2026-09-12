@@ -27,6 +27,7 @@
   let state = {
     user:         { name: 'Trader', email: '' },
     balance:      0,
+    demo_balance: 10000.00,
     transactions: [],
   };
 
@@ -36,9 +37,23 @@
     if (cachedState) {
       const parsed = JSON.parse(cachedState);
       if (typeof parsed.balance === 'number') state.balance = parsed.balance;
+      if (typeof parsed.demo_balance === 'number') state.demo_balance = parsed.demo_balance;
       if (Array.isArray(parsed.transactions)) state.transactions = parsed.transactions;
     }
   } catch (_) {}
+  if (typeof state.demo_balance !== 'number') {
+    state.demo_balance = 10000.00;
+  }
+
+  let currentAccountType = localStorage.getItem('et_account_type') || 'real'; // 'real' or 'demo'
+
+  function getActiveBalance() {
+    if (currentAccountType === 'demo') {
+      if (typeof state.demo_balance !== 'number') state.demo_balance = 10000.00;
+      return parseFloat(state.demo_balance.toFixed(2));
+    }
+    return parseFloat((Number(state.balance) || 0).toFixed(2));
+  }
 
   let firestoreUid = null;
 
@@ -64,6 +79,7 @@
     try {
       localStorage.setItem('et_state_cache', JSON.stringify({
         balance: s.balance,
+        demo_balance: s.demo_balance,
         transactions: s.transactions.slice(-200)
       }));
     } catch (_) {}
@@ -73,6 +89,7 @@
     try {
       await db.collection('users').doc(uid).set({
         balance:      s.balance,
+        demo_balance: s.demo_balance,
         transactions: s.transactions.slice(-200),
       }, { merge: true });
     } catch (err) {
@@ -90,7 +107,7 @@
   let currentCategory     = 'digits'; // digits, risefall, multipliers
   let currentDigitSubmode = 'over_under'; // over_under, even_odd, matches_differs
   let currentDuration     = '1m';
-  let currentStake        = 10;
+  let currentStake        = 1;
   let openPositions       = [];
   let closedPositions     = [];
 
@@ -181,11 +198,63 @@
   }
 
   function updateBalanceUI(flash) {
-    const b = fmt(state.balance);
+    const isDemo = currentAccountType === 'demo';
+    const activeBal = getActiveBalance();
+    const b = fmt(activeBal);
     if (balanceEl) balanceEl.textContent = b;
     if (panelBalanceEl) panelBalanceEl.textContent = b;
     const modalBalanceEl = document.getElementById('modalBalance');
     if (modalBalanceEl) modalBalanceEl.textContent = b;
+
+    // Dropdown balances
+    const dropRealBalEl = document.getElementById('dropRealBal');
+    const dropDemoBalEl = document.getElementById('dropDemoBal');
+    if (dropRealBalEl) dropRealBalEl.textContent = fmt(state.balance);
+    if (dropDemoBalEl) dropDemoBalEl.textContent = fmt(state.demo_balance);
+
+    // Dropdown ID
+    const dropRealIdEl = document.getElementById('dropRealId');
+    const realUid = getUid() || '375286';
+    const cleanId = realUid.replace(/^usr_/, '').slice(0, 6).toUpperCase();
+    if (dropRealIdEl) dropRealIdEl.textContent = `ET-${cleanId}`;
+
+    // Header Pill Type tag
+    const balanceTypeEl = document.querySelector('.st-balance-type');
+    if (balanceTypeEl) {
+      balanceTypeEl.textContent = isDemo ? 'DEMO' : 'REAL';
+      balanceTypeEl.style.color = isDemo ? '#38bdf8' : '#10b981';
+    }
+
+    // Header Account Badge
+    const accountBadgeEl = document.getElementById('headerAccountBadge') || document.querySelector('.st-account-badge');
+    const accountTextEl  = document.querySelector('.st-account-text');
+    const accountIdEl    = document.getElementById('accountBadgeId');
+    const liveDotEl      = document.querySelector('.st-live-dot');
+
+    if (accountTextEl) accountTextEl.textContent = isDemo ? 'DEMO ACCOUNT' : 'LIVE ACCOUNT';
+    if (accountIdEl) accountIdEl.textContent = isDemo ? 'ET-DEMO-10K' : `ET-${cleanId}`;
+    if (accountBadgeEl) {
+      accountBadgeEl.style.backgroundColor = isDemo ? 'rgba(6, 182, 212, 0.14)' : 'rgba(5, 150, 105, 0.12)';
+      accountBadgeEl.style.borderColor     = isDemo ? 'rgba(6, 182, 212, 0.35)' : 'rgba(16, 185, 129, 0.25)';
+    }
+    if (liveDotEl) {
+      liveDotEl.style.backgroundColor = isDemo ? '#38bdf8' : '#10b981';
+      liveDotEl.style.boxShadow       = isDemo ? '0 0 8px #38bdf8' : '0 0 8px #10b981';
+    }
+
+    // Header Tabs
+    document.querySelectorAll('#accountTabs .st-acc-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.switchAcc === currentAccountType);
+    });
+
+    // Dropdown cards
+    document.getElementById('accCardReal')?.classList.toggle('active', !isDemo);
+    document.getElementById('accCardDemo')?.classList.toggle('active', isDemo);
+
+    // Auto-adjust stake if stake > active balance
+    if (activeBal > 0 && currentStake > activeBal) {
+      setStake(Math.min(1.00, activeBal));
+    }
 
     updateExecutionControls();
   }
@@ -744,13 +813,30 @@
 
   // Stake input & Steppers
   function setStake(amount) {
-    currentStake = Math.max(MIN_STAKE, parseFloat(Number(amount).toFixed(2)));
+    currentStake = Math.max(MIN_STAKE, parseFloat(Number(amount).toFixed(2)) || MIN_STAKE);
     if (stakeInputEl) stakeInputEl.value = currentStake;
+    document.querySelectorAll('.st-chip').forEach(c => {
+      c.classList.toggle('active', parseFloat(c.dataset.stake) === currentStake);
+    });
     updateExecutionControls();
   }
 
-  if (stakeMinusBtn) stakeMinusBtn.addEventListener('click', () => setStake(currentStake - 1));
-  if (stakePlusBtn) stakePlusBtn.addEventListener('click', () => setStake(currentStake + 1));
+  if (stakeMinusBtn) {
+    stakeMinusBtn.addEventListener('click', () => {
+      if (currentStake <= 0.50) setStake(0.35);
+      else if (currentStake <= 1.00) setStake(0.50);
+      else if (currentStake <= 5.00) setStake(currentStake - 1);
+      else setStake(currentStake - 5);
+    });
+  }
+  if (stakePlusBtn) {
+    stakePlusBtn.addEventListener('click', () => {
+      if (currentStake < 0.50) setStake(0.50);
+      else if (currentStake < 1.00) setStake(1.00);
+      else if (currentStake < 5.00) setStake(currentStake + 1);
+      else setStake(currentStake + 5);
+    });
+  }
   if (stakeInputEl) {
     stakeInputEl.addEventListener('input', (e) => setStake(parseFloat(e.target.value) || 0));
   }
@@ -758,8 +844,6 @@
   // Quick Chips
   document.querySelectorAll('.st-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      document.querySelectorAll('.st-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
       setStake(parseFloat(chip.dataset.stake));
     });
   });
@@ -823,8 +907,15 @@
 
     // 3. Balance verification hint
     if (balanceStatusHint) {
-      if (currentStake > state.balance) {
+      const activeBal = getActiveBalance();
+      if (currentStake > activeBal) {
         balanceStatusHint.style.display = 'block';
+        if (currentAccountType === 'demo') {
+          balanceStatusHint.innerHTML = '<span>Not enough demo balance &bull; </span><button type="button" class="st-deposit-link" id="hintResetDemo">reset $10,000</button>';
+          document.getElementById('hintResetDemo')?.addEventListener('click', resetDemoFunds);
+        } else {
+          balanceStatusHint.innerHTML = '<span>Not enough balance &bull; </span><button type="button" class="st-deposit-link" data-open-deposit>deposit</button>';
+        }
       } else {
         balanceStatusHint.style.display = 'none';
       }
@@ -835,14 +926,24 @@
      10. EXECUTION & POSITIONS DRAWER
   ══════════════════════════════════════════════════════ */
   function placeContract(type, title, winCondition, profitVal) {
-    if (currentStake > state.balance) {
-      showToast('Insufficient balance. Please deposit funds.', 'error');
-      openModal(depositModal);
+    const activeBalance = getActiveBalance();
+    if (currentStake > activeBalance) {
+      if (currentAccountType === 'demo') {
+        showToast('Insufficient demo funds. Resetting to $10,000.', 'info');
+        resetDemoFunds();
+      } else {
+        showToast('Insufficient balance. Please deposit funds or switch to Demo.', 'error');
+        openModal(depositModal);
+      }
       return;
     }
 
-    // Deduct stake
-    state.balance = parseFloat((state.balance - currentStake).toFixed(2));
+    // Deduct stake from active account
+    if (currentAccountType === 'demo') {
+      state.demo_balance = parseFloat((state.demo_balance - currentStake).toFixed(2));
+    } else {
+      state.balance = parseFloat((state.balance - currentStake).toFixed(2));
+    }
     updateBalanceUI('lose');
 
     const m = MARKETS[currentMarketIdx];
@@ -850,6 +951,7 @@
       id: 'POS-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
       market: m.symbol,
       type: title,
+      accountType: currentAccountType, // 'real' or 'demo'
       stake: currentStake,
       profit: Math.abs(parseFloat(profitVal) || 0),
       entrySpot: currentPrices[currentMarketIdx],
@@ -861,7 +963,8 @@
 
     openPositions.push(pos);
     renderPositions();
-    showToast(`${title} contract placed on ${m.symbol}!`, 'info');
+    const tag = currentAccountType === 'demo' ? ' [Demo]' : '';
+    showToast(`${title} contract placed on ${m.symbol}!${tag}`, 'info');
   }
 
   function stepOpenPositions(currPrice, currDigit) {
@@ -879,13 +982,21 @@
         const absProfit = Math.abs(pos.profit);
         const absStake  = Math.abs(pos.stake);
 
+        let finalActiveBal = 0;
         if (won) {
           const payout = pos.stake + absProfit;
-          state.balance = parseFloat((state.balance + payout).toFixed(2));
+          if (pos.accountType === 'demo') {
+            state.demo_balance = parseFloat(((state.demo_balance || 0) + payout).toFixed(2));
+            finalActiveBal = state.demo_balance;
+          } else {
+            state.balance = parseFloat((state.balance + payout).toFixed(2));
+            finalActiveBal = state.balance;
+          }
           updateBalanceUI('win');
-          showResultOverlay(true, absStake, absProfit, state.balance);
+          showResultOverlay(true, absStake, absProfit, finalActiveBal);
         } else {
-          showResultOverlay(false, absStake, absProfit, state.balance);
+          finalActiveBal = pos.accountType === 'demo' ? state.demo_balance : state.balance;
+          showResultOverlay(false, absStake, absProfit, finalActiveBal);
           updateBalanceUI('lose');
         }
 
@@ -903,6 +1014,7 @@
         // Record in transactions
         state.transactions.push({
           type: 'trade',
+          accountType: pos.accountType || 'real',
           market: pos.market,
           direction: pos.type,
           stake: absStake,
@@ -1141,6 +1253,65 @@
 
   resultOverlay?.addEventListener('click', (e) => {
     if (e.target === resultOverlay) resultOverlay.classList.remove('show');
+  });
+
+  /* ══════════════════════════════════════════════════════
+     ACCOUNT SWITCHER (Real vs Demo $10,000)
+  ══════════════════════════════════════════════════════ */
+  function switchAccount(type) {
+    if (type !== 'real' && type !== 'demo') return;
+    currentAccountType = type;
+    localStorage.setItem('et_account_type', type);
+    updateBalanceUI();
+    const dropdown = document.getElementById('accountDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    if (type === 'demo') {
+      showToast('Switched to Demo Account ($10,000 Virtual Funds). Trade freely!', 'info');
+    } else {
+      showToast('Switched to Real Live Account.', 'info');
+    }
+  }
+
+  function resetDemoFunds() {
+    state.demo_balance = 10000.00;
+    saveState(state);
+    updateBalanceUI('win');
+    showToast('Demo balance reset to $10,000.00 virtual funds!', 'success');
+  }
+
+  // Header tab clicks & card clicks
+  document.querySelectorAll('[data-switch-acc]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchAccount(btn.dataset.switchAcc);
+    });
+  });
+
+  // Reset Demo buttons
+  document.getElementById('btnResetDemoDropdown')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetDemoFunds();
+  });
+
+  // Dropdown toggle on clicking balance pill or account badge
+  const balancePill = document.getElementById('headerBalancePill');
+  const accountBadge = document.getElementById('headerAccountBadge');
+  const accountDropdown = document.getElementById('accountDropdown');
+
+  function toggleAccountDropdown(e) {
+    e.stopPropagation();
+    if (!accountDropdown) return;
+    const isVisible = accountDropdown.style.display !== 'none';
+    accountDropdown.style.display = isVisible ? 'none' : 'flex';
+  }
+
+  if (balancePill) balancePill.addEventListener('click', toggleAccountDropdown);
+  if (accountBadge) accountBadge.addEventListener('click', toggleAccountDropdown);
+
+  document.addEventListener('click', (e) => {
+    if (accountDropdown && !accountDropdown.contains(e.target) && e.target !== balancePill && e.target !== accountBadge) {
+      accountDropdown.style.display = 'none';
+    }
   });
 
   /* ══════════════════════════════════════════════════════

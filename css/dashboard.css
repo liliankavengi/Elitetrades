@@ -214,6 +214,162 @@ body.dashboard-body {
   box-shadow: 0 0 22px rgba(124, 58, 237, 0.55);
 }
 
+/* Account Mode Tabs (Real vs Demo $10k) */
+.st-account-tabs {
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--st-border);
+  border-radius: 20px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.st-acc-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--st-text-dim);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.st-acc-tab:hover {
+  color: #ffffff;
+}
+
+.st-acc-tab.active[data-switch-acc="real"] {
+  background-color: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.st-acc-tab.active[data-switch-acc="demo"] {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(139, 92, 246, 0.2));
+  color: #38bdf8;
+  border: 1px solid rgba(6, 182, 212, 0.45);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+}
+
+.st-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.st-tab-dot.live-dot {
+  background-color: var(--st-neon-green);
+  box-shadow: 0 0 6px var(--st-neon-green);
+}
+
+.st-tab-dot.demo-dot {
+  background-color: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.st-demo-dot-sm {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+  display: inline-block;
+}
+
+/* Account Dropdown Wrap */
+.st-account-pill-wrap {
+  position: relative;
+}
+
+.st-account-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 280px;
+  background-color: #0b1120;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  backdrop-filter: blur(16px);
+}
+
+.st-acc-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: var(--st-panel);
+  border: 1px solid var(--st-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.st-acc-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background-color: var(--st-panel-hover);
+}
+
+.st-acc-card.active {
+  border-color: rgba(124, 58, 237, 0.5);
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.st-acc-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.st-acc-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.st-acc-badge.real { color: #10b981; }
+.st-acc-badge.demo { color: #38bdf8; }
+
+.st-acc-id {
+  font-size: 0.68rem;
+  color: var(--st-text-dim);
+}
+
+.st-acc-card-bal {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-acc-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-xs {
+  padding: 4px 10px;
+  font-size: 0.74rem;
+  border-radius: 6px;
+}
+
 /* Avatar circle */
 .st-user-avatar {
   width: 34px;
