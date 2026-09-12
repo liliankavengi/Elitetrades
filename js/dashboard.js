@@ -37,17 +37,34 @@
 
   let firestoreUid = null;   // set after auth resolves
 
+  // Resolve or generate a persistent user/client ID
+  function getUid() {
+    if (firestoreUid) return firestoreUid;
+    if (typeof auth !== 'undefined' && auth.currentUser) {
+      firestoreUid = auth.currentUser.uid;
+      return firestoreUid;
+    }
+    let cached = localStorage.getItem('et_uid');
+    if (!cached) {
+      cached = 'usr_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      localStorage.setItem('et_uid', cached);
+    }
+    firestoreUid = cached;
+    return firestoreUid;
+  }
+
   /** Write state back to Firestore (keep last 200 transactions) */
   async function saveState(s) {
     // Always keep a local cache for instant UI updates
     try { localStorage.setItem('et_state_cache', JSON.stringify({ balance: s.balance, transactions: s.transactions.slice(-200) })); } catch (_) {}
 
-    if (!firestoreUid) return;  // not yet authenticated
+    const uid = getUid();
+    if (!uid || typeof db === 'undefined') return;
     try {
-      await db.collection('users').doc(firestoreUid).update({
+      await db.collection('users').doc(uid).set({
         balance:      s.balance,
         transactions: s.transactions.slice(-200), // keep last 200
-      });
+      }, { merge: true });
     } catch (err) {
       console.warn('Firestore write failed:', err.message);
     }
@@ -641,44 +658,39 @@
     btn.disabled    = true;
 
     try {
-      let result;
-      try {
-        const apiRes = await fetch('/api/initiate-deposit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount_kes: kes, phone, uid: firestoreUid })
-        });
-        const resData = await apiRes.json();
-        if (!resData.success) throw new Error(resData.error || 'Failed to initiate deposit');
-        result = { data: resData };
-      } catch (fetchErr) {
-        if (typeof firebase !== 'undefined' && firebase.functions) {
-          const initiateDeposit = firebase.functions().httpsCallable('initiateDeposit');
-          result = await initiateDeposit({ amount_kes: kes, phone });
-        } else {
-          throw fetchErr;
-        }
+      const activeUid = getUid();
+      const apiRes = await fetch('/api/initiate-deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount_kes: kes, phone, uid: activeUid })
+      });
+
+      const resData = await apiRes.json().catch(() => null);
+
+      if (!apiRes.ok || !resData || !resData.success) {
+        const errMsg = (resData && resData.error) || 'Failed to initiate deposit. Please try again.';
+        throw new Error(errMsg);
       }
 
-      if (result.data.success) {
-        const ref = result.data.reference;
+      const result = { data: resData };
+      const ref = result.data.reference;
 
-        // Switch to waiting UI
-        document.getElementById('mpesaDepositForm').style.display = 'none';
-        document.getElementById('mpesaWaiting').style.display     = '';
+      // Switch to waiting UI
+      document.getElementById('mpesaDepositForm').style.display = 'none';
+      document.getElementById('mpesaWaiting').style.display     = '';
 
-        // Listen for Firestore status change (updated by PayHero callback)
+      // Listen for Firestore status change (updated by PayHero callback)
+      if (typeof db !== 'undefined') {
         mpesaUnsubscribe = db.collection('pending_deposits').doc(ref)
           .onSnapshot((snap) => {
             const data = snap.data();
             if (!data) return;
 
             if (data.status === 'completed') {
-              mpesaUnsubscribe && mpesaUnsubscribe();
-              mpesaUnsubscribe = null;
+              if (mpesaUnsubscribe) { mpesaUnsubscribe(); mpesaUnsubscribe = null; }
 
               // Reload user balance from Firestore
-              db.collection('users').doc(firestoreUid).get().then(userDoc => {
+              db.collection('users').doc(activeUid).get().then(userDoc => {
                 if (userDoc.exists) {
                   const d = userDoc.data();
                   state.balance      = d.balance || 0;
@@ -687,7 +699,7 @@
                   updateStats();
                   renderHistory();
                 }
-              });
+              }).catch(() => {});
 
               closeModal(depositModal);
               document.getElementById('mpesaWaiting').style.display     = 'none';
@@ -698,14 +710,15 @@
               showToast(`Deposit of KES ${kes} (~$${data.amount_usd}) confirmed!`, 'success');
 
             } else if (data.status === 'failed' || data.status === 'cancelled') {
-              mpesaUnsubscribe && mpesaUnsubscribe();
-              mpesaUnsubscribe = null;
+              if (mpesaUnsubscribe) { mpesaUnsubscribe(); mpesaUnsubscribe = null; }
               document.getElementById('mpesaWaiting').style.display     = 'none';
               document.getElementById('mpesaDepositForm').style.display  = '';
               btn.textContent = 'Send M-Pesa Prompt';
               btn.disabled    = false;
               showDepositError('Payment was ' + data.status + '. Please try again.');
             }
+          }, (err) => {
+            console.warn('Firestore pending_deposits listener:', err.message);
           });
       }
 
@@ -838,37 +851,32 @@
 
     try {
       if (method === 'M-Pesa') {
-        let result;
-        try {
-          const apiRes = await fetch('/api/initiate-withdrawal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount_usd: amount, phone: account, uid: firestoreUid })
-          });
-          const resData = await apiRes.json();
-          if (!resData.success) throw new Error(resData.error || 'Failed to initiate withdrawal');
-          result = { data: resData };
-        } catch (fetchErr) {
-          if (typeof firebase !== 'undefined' && firebase.functions) {
-            const initiateWithdrawal = firebase.functions().httpsCallable('initiateWithdrawal');
-            result = await initiateWithdrawal({ amount_usd: amount, phone: account });
-          } else {
-            throw fetchErr;
-          }
+        const activeUid = getUid();
+        const apiRes = await fetch('/api/initiate-withdrawal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount_usd: amount, phone: account, uid: activeUid })
+        });
+        const resData = await apiRes.json().catch(() => null);
+        if (!apiRes.ok || !resData || !resData.success) {
+          throw new Error((resData && resData.error) || 'Failed to initiate withdrawal');
         }
 
         // Reload balance from Firestore
-        const userDoc = await db.collection('users').doc(firestoreUid).get();
-        if (userDoc.exists) {
-          const d = userDoc.data();
-          state.balance      = d.balance || 0;
-          state.transactions = d.transactions || [];
-          updateBalanceUI('lose');
-          updateStats();
-          renderHistory();
+        if (typeof db !== 'undefined') {
+          db.collection('users').doc(activeUid).get().then(userDoc => {
+            if (userDoc.exists) {
+              const d = userDoc.data();
+              state.balance      = d.balance || 0;
+              state.transactions = d.transactions || [];
+              updateBalanceUI('lose');
+              updateStats();
+              renderHistory();
+            }
+          }).catch(() => {});
         }
         closeModal(withdrawModal);
-        showToast(result.data.message || `Withdrawal of ${fmt(amount)} processed instantly.`, 'success');
+        showToast(resData.message || `Withdrawal of ${fmt(amount)} processed instantly.`, 'success');
 
       } else {
         // PayPal / USDT: manual processing (no B2C API yet)
@@ -914,7 +922,7 @@
   }
 
   /* ══════════════════════════════════════════════════════
-     14. INITIALISE
+     14. INITIALISE & AUTH
   ══════════════════════════════════════════════════════ */
   updateBalanceUI();
   updateStats();
@@ -928,6 +936,61 @@
   if (window.lucide) {
     lucide.createIcons();
   }
+
+  // Load cached state if available
+  try {
+    const cached = JSON.parse(localStorage.getItem('et_state_cache') || '{}');
+    if (typeof cached.balance === 'number') state.balance = cached.balance;
+    if (Array.isArray(cached.transactions)) state.transactions = cached.transactions;
+    updateBalanceUI();
+    updateStats();
+    renderHistory();
+  } catch (_) {}
+
+  // Hook Firebase Auth listener
+  if (typeof auth !== 'undefined') {
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        firestoreUid = user.uid;
+        localStorage.setItem('et_uid', user.uid);
+
+        if (typeof db !== 'undefined') {
+          db.collection('users').doc(user.uid).onSnapshot((doc) => {
+            if (doc.exists) {
+              const d = doc.data();
+              state.user = {
+                name: d.name || user.displayName || (user.email ? user.email.split('@')[0] : 'Trader'),
+                email: d.email || user.email || '',
+              };
+              if (typeof d.balance === 'number') state.balance = d.balance;
+              if (Array.isArray(d.transactions)) state.transactions = d.transactions;
+
+              updateBalanceUI();
+              updateStats();
+              renderHistory();
+              const greetEl = document.getElementById('userGreeting');
+              if (greetEl) greetEl.textContent = 'Hello, ' + state.user.name;
+            }
+          }, (err) => console.warn('Firestore snapshot error:', err.message));
+        }
+      } else {
+        firestoreUid = getUid();
+      }
+    });
+  } else {
+    firestoreUid = getUid();
+  }
+
+  // Sign out listener
+  document.querySelectorAll('[data-signout]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        if (typeof auth !== 'undefined') await auth.signOut();
+      } catch (_) {}
+      localStorage.removeItem('et_state_cache');
+      window.location.href = 'login.html';
+    });
+  });
 
   // Show onboarding toast if balance is 0
   if (state.balance === 0) {
