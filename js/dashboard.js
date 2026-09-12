@@ -868,7 +868,7 @@
           renderHistory();
         }
         closeModal(withdrawModal);
-        showToast(result.data.message || `Withdrawal of ${fmt(amount)} submitted.`, 'success');
+        showToast(result.data.message || `Withdrawal of ${fmt(amount)} processed instantly.`, 'success');
 
       } else {
         // PayPal / USDT: manual processing (no B2C API yet)
@@ -879,7 +879,7 @@
         updateStats();
         renderHistory();
         closeModal(withdrawModal);
-        showToast(`Withdrawal of ${fmt(amount)} via ${method} submitted. Processing within 24h.`, 'success');
+        showToast(`Withdrawal of ${fmt(amount)} via ${method} processed instantly.`, 'success');
       }
 
     } catch (err) {

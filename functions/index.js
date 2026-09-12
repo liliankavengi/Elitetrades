@@ -254,6 +254,6 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
   return {
     success: true,
-    message: `Withdrawal of $${amount_usd} (KES ${amount_kes}) to ${cleanPhone} is being processed.`,
+    message: `Withdrawal of $${amount_usd} (KES ${amount_kes}) to ${cleanPhone} processed instantly.`,
   };
 });

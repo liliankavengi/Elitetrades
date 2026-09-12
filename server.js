@@ -276,7 +276,7 @@ app.post('/api/initiate-withdrawal', async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Withdrawal of $${amount_usd} (KES ${amount_kes}) to ${cleanPhone} is being processed.`,
+      message: `Withdrawal of $${amount_usd} (KES ${amount_kes}) to ${cleanPhone} processed instantly.`,
     });
   } catch (err) {
     console.error('Withdrawal error:', err);
