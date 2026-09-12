@@ -392,6 +392,26 @@ app.get('/api/check-deposit-status', async (req, res) => {
             amount_kes,
             balance: newBal,
           });
+        } else if (phStatus === 'FAILED' || phStatus === 'CANCELLED') {
+          const lowerStatus = phStatus.toLowerCase();
+          inMemoryDeposits.set(reference, {
+            ...pending,
+            status: lowerStatus,
+            failedAt: Date.now(),
+          });
+          try {
+            await pendingRef.update({
+              status: lowerStatus,
+              failed_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          } catch (_) {}
+
+          return res.json({
+            success: true,
+            status: lowerStatus,
+            amount_usd: pending.amount_usd,
+            amount_kes: pending.amount_kes,
+          });
         }
       }
     } catch (e) {

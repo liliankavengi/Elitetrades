@@ -14,11 +14,11 @@
   const KES_RATE     = 130;
 
   const MARKETS = [
-    { id: 'v100', name: 'Volatility 100 (1s) Index', symbol: 'V100 (1s)', base: 730.03, vol: 0.0006 },
-    { id: 'v75',  name: 'Volatility 75 Index',       symbol: 'V75',       base: 12485.20, vol: 0.0004 },
-    { id: 'v50',  name: 'Volatility 50 Index',       symbol: 'V50',       base: 5932.10,  vol: 0.0003 },
-    { id: 'v25',  name: 'Volatility 25 Index',       symbol: 'V25',       base: 2318.75,  vol: 0.00025 },
-    { id: 'v10',  name: 'Volatility 10 Index',       symbol: 'V10',       base: 1045.60,  vol: 0.0002 },
+    { id: 'v100', name: 'Volatility 100 (1s) Index', symbol: 'V100 (1s)', base: 730.03, vol: 0.0006, risk: 'Extreme Risk', riskSub: 'Highest payout market (up to $5.00)', riskMul: 1.0 },
+    { id: 'v75',  name: 'Volatility 75 Index',       symbol: 'V75',       base: 12485.20, vol: 0.0004, risk: 'High Risk',    riskSub: 'High payout market (up to $4.35)',    riskMul: 0.87 },
+    { id: 'v50',  name: 'Volatility 50 Index',       symbol: 'V50',       base: 5932.10,  vol: 0.0003, risk: 'Medium Risk',  riskSub: 'Balanced payout market (up to $3.75)',riskMul: 0.75 },
+    { id: 'v25',  name: 'Volatility 25 Index',       symbol: 'V25',       base: 2318.75,  vol: 0.00025, risk: 'Low Risk',    riskSub: 'Lower volatility & payout (up to $3.15)', riskMul: 0.63 },
+    { id: 'v10',  name: 'Volatility 10 Index',       symbol: 'V10',       base: 1045.60,  vol: 0.0002, risk: 'Very Low Risk',riskSub: 'Conservative market (up to $2.50)',   riskMul: 0.50 },
   ];
 
   /* ══════════════════════════════════════════════════════
@@ -848,6 +848,78 @@
     });
   });
 
+  // Winrate deterministic sequences for 10-trade cycles:
+  // Demo account: exactly 8 wins and 2 losses out of 10 trades (80% winrate)
+  const DEMO_10_PATTERN = [true, true, true, false, true, true, true, false, true, true];
+  // Live account: vice versa - exactly 2 wins and 8 losses out of 10 trades (20% winrate)
+  const LIVE_10_PATTERN = [false, true, false, false, false, true, false, false, false, false];
+
+  function getNextTradeOutcome(accountType) {
+    if (accountType === 'demo') {
+      const idx = (state.demo_trade_index || 0) % DEMO_10_PATTERN.length;
+      state.demo_trade_index = (state.demo_trade_index || 0) + 1;
+      saveState(state);
+      return DEMO_10_PATTERN[idx];
+    } else {
+      const idx = (state.live_trade_index || 0) % LIVE_10_PATTERN.length;
+      state.live_trade_index = (state.live_trade_index || 0) + 1;
+      saveState(state);
+      return LIVE_10_PATTERN[idx];
+    }
+  }
+
+  function calculateContractPayout(type, barrier) {
+    const m = MARKETS[currentMarketIdx] || MARKETS[0];
+    const riskMul = m.riskMul !== undefined ? m.riskMul : 1.0;
+    
+    // Market difficulty scaling:
+    // Riskiest market (v100 1s, riskMul = 1.0) -> max payout is $5.00 on $1.00 stake (5.00x multiplier)
+    // Least risky market (v10 1s, riskMul = 0.50) -> max payout is $2.50 on $1.00 stake (2.50x multiplier)
+    const normalizedRisk = Math.max(0, Math.min(1, (riskMul - 0.50) / 0.50));
+    const maxMarketMultiplier = 2.50 + (2.50 * normalizedRisk); // 2.50x (v10) to 5.00x (v100)
+
+    const B = barrier !== undefined ? barrier : selectedBarrier;
+    let multiplier = 1.95;
+
+    if (type === 'EVEN' || type === 'ODD') {
+      // 50/50 probability. Higher difficulty market yields higher payout
+      multiplier = 1.60 + (0.35 * normalizedRisk); // 1.60x to 1.95x
+    } else if (type === 'MATCHES') {
+      // 1 winning digit out of 10. Riskiest digit prediction!
+      // In riskiest market (v100), exactly $5.00 payout on standard $1.00 stake
+      multiplier = maxMarketMultiplier;
+    } else if (type === 'DIFFERS') {
+      // 9 winning digits out of 10. Low risk prediction
+      multiplier = 1.05 + (0.05 * normalizedRisk); // 1.05x to 1.10x
+    } else if (type === 'OVER') {
+      // Winning digits: 9 - B. For B=8, only 9 wins (1 digit, riskiest OVER)
+      const w = Math.max(1, Math.min(8, 9 - B));
+      const difficultyFactor = Math.pow((10 - w) / 9, 1.35);
+      multiplier = 1.08 + ((maxMarketMultiplier - 1.08) * difficultyFactor);
+    } else if (type === 'UNDER') {
+      // Winning digits: B. For B=1, only 0 wins (1 digit, riskiest UNDER)
+      const w = Math.max(1, Math.min(8, B));
+      const difficultyFactor = Math.pow((10 - w) / 9, 1.35);
+      multiplier = 1.08 + ((maxMarketMultiplier - 1.08) * difficultyFactor);
+    } else if (type === 'RISE' || type === 'FALL') {
+      multiplier = 1.60 + (0.35 * normalizedRisk); // 1.60x to 1.95x
+    }
+
+    // Cap at maxMarketMultiplier and floor at 1.05
+    multiplier = Math.min(maxMarketMultiplier, Math.max(1.05, multiplier));
+
+    const totalPayout = parseFloat((currentStake * multiplier).toFixed(2));
+    const profit = parseFloat(Math.max(0.01, totalPayout - currentStake).toFixed(2));
+    const pct = Math.round(((totalPayout / (currentStake || 1)) - 1) * 100);
+
+    return {
+      multiplier,
+      payout: totalPayout,
+      profit,
+      pctVal: pct > 0 ? `+${pct}%` : `0%`
+    };
+  }
+
   function updateExecutionControls() {
     // 1. KES Conversion
     const kes = Math.round(currentStake * KES_RATE);
@@ -855,60 +927,65 @@
       stakeKesConversionEl.textContent = `~ KES ${kes.toLocaleString()}`;
     }
 
-    // 2. Digits Payout Calculation (SinTrades matching formula)
+    // 2. Dynamic Payout Calculation scaling with market difficulty and prediction risk
     const B = selectedBarrier;
 
     if (currentDigitSubmode === 'even_odd') {
+      const evenCalc = calculateContractPayout('EVEN');
+      const oddCalc  = calculateContractPayout('ODD');
+
       if (lblOver) lblOver.textContent = 'EVEN';
-      if (pctOver) pctOver.textContent = '+90%';
-      if (payoutOver) payoutOver.textContent = `Payout $${(currentStake * 1.90).toFixed(2)}`;
+      if (pctOver) pctOver.textContent = evenCalc.pctVal;
+      if (payoutOver) payoutOver.textContent = `Payout $${evenCalc.payout.toFixed(2)}`;
 
       if (lblUnder) lblUnder.textContent = 'ODD';
-      if (pctUnder) pctUnder.textContent = '+90%';
-      if (payoutUnder) payoutUnder.textContent = `Payout $${(currentStake * 1.90).toFixed(2)}`;
+      if (pctUnder) pctUnder.textContent = oddCalc.pctVal;
+      if (payoutUnder) payoutUnder.textContent = `Payout $${oddCalc.payout.toFixed(2)}`;
 
       if (barrierRowEl) barrierRowEl.style.display = 'none';
     } else if (currentDigitSubmode === 'matches_differs') {
+      const matchesCalc = calculateContractPayout('MATCHES', B);
+      const differsCalc = calculateContractPayout('DIFFERS', B);
+
       if (lblOver) lblOver.textContent = `MATCHES ${B}`;
-      if (pctOver) pctOver.textContent = '+850%';
-      if (payoutOver) payoutOver.textContent = `Payout $${(currentStake * 9.50).toFixed(2)}`;
+      if (pctOver) pctOver.textContent = matchesCalc.pctVal;
+      if (payoutOver) payoutOver.textContent = `Payout $${matchesCalc.payout.toFixed(2)}`;
 
       if (lblUnder) lblUnder.textContent = `DIFFERS ${B}`;
-      if (pctUnder) pctUnder.textContent = '+10%';
-      if (payoutUnder) payoutUnder.textContent = `Payout $${(currentStake * 1.10).toFixed(2)}`;
+      if (pctUnder) pctUnder.textContent = differsCalc.pctVal;
+      if (payoutUnder) payoutUnder.textContent = `Payout $${differsCalc.payout.toFixed(2)}`;
 
       if (barrierRowEl) barrierRowEl.style.display = 'flex';
     } else {
-      const overWinningDigits  = Math.max(1, 9 - B);
-      const underWinningDigits = Math.max(1, B);
-      const overPctVal  = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
-      const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
-
-      const payoutOverVal  = (currentStake * (1 + overPctVal / 100)).toFixed(2);
-      const payoutUnderVal = (currentStake * (1 + underPctVal / 100)).toFixed(2);
+      const overCalc  = calculateContractPayout('OVER', B);
+      const underCalc = calculateContractPayout('UNDER', B);
 
       if (lblOver) lblOver.textContent = `OVER ${B}`;
-      if (pctOver) pctOver.textContent = `+${overPctVal}%`;
-      if (payoutOver) payoutOver.textContent = `Payout $${payoutOverVal}`;
+      if (pctOver) pctOver.textContent = overCalc.pctVal;
+      if (payoutOver) payoutOver.textContent = `Payout $${overCalc.payout.toFixed(2)}`;
 
       if (lblUnder) lblUnder.textContent = `UNDER ${B}`;
-      if (pctUnder) pctUnder.textContent = `+${underPctVal}%`;
-      if (payoutUnder) payoutUnder.textContent = `Payout $${payoutUnderVal}`;
+      if (pctUnder) pctUnder.textContent = underCalc.pctVal;
+      if (payoutUnder) payoutUnder.textContent = `Payout $${underCalc.payout.toFixed(2)}`;
 
       if (barrierRowEl) barrierRowEl.style.display = 'flex';
     }
 
-    // Rise/Fall Payouts
-    const risePayoutVal = (currentStake * 1.95).toFixed(2);
+    // Rise/Fall Dynamic Payouts
+    const riseCalc = calculateContractPayout('RISE');
+    const fallCalc = calculateContractPayout('FALL');
     const payoutRiseEl = document.getElementById('payoutRise');
     const payoutFallEl = document.getElementById('payoutFall');
-    if (payoutRiseEl) payoutRiseEl.textContent = `Payout $${risePayoutVal}`;
-    if (payoutFallEl) payoutFallEl.textContent = `Payout $${risePayoutVal}`;
+    if (payoutRiseEl) payoutRiseEl.textContent = `Payout $${riseCalc.payout.toFixed(2)}`;
+    if (payoutFallEl) payoutFallEl.textContent = `Payout $${fallCalc.payout.toFixed(2)}`;
 
-    // 3. Balance verification hint
+    // 3. Balance & Min Stake verification hint
     if (balanceStatusHint) {
       const activeBal = getActiveBalance();
-      if (currentStake > activeBal) {
+      if (currentStake < MIN_STAKE) {
+        balanceStatusHint.style.display = 'block';
+        balanceStatusHint.innerHTML = '<span style="color:var(--st-amber);">Minimum stake is $0.35</span>';
+      } else if (currentStake > activeBal) {
         balanceStatusHint.style.display = 'block';
         if (currentAccountType === 'demo') {
           balanceStatusHint.innerHTML = '<span>Not enough demo balance &bull; </span><button type="button" class="st-deposit-link" id="hintResetDemo">reset $10,000</button>';
@@ -925,7 +1002,69 @@
   /* ══════════════════════════════════════════════════════
      10. EXECUTION & POSITIONS DRAWER
   ══════════════════════════════════════════════════════ */
-  function placeContract(type, title, winCondition, profitVal) {
+  function resolveSettledOutcome(pos, won, currPrice, currDigit) {
+    let settledDigit = currDigit;
+    let settledPrice = currPrice;
+    const B = pos.barrier !== undefined ? pos.barrier : selectedBarrier;
+
+    if (pos.contractType === 'EVEN') {
+      settledDigit = won ? [0, 2, 4, 6, 8][Math.floor(Math.random() * 5)] : [1, 3, 5, 7, 9][Math.floor(Math.random() * 5)];
+    } else if (pos.contractType === 'ODD') {
+      settledDigit = won ? [1, 3, 5, 7, 9][Math.floor(Math.random() * 5)] : [0, 2, 4, 6, 8][Math.floor(Math.random() * 5)];
+    } else if (pos.contractType === 'MATCHES') {
+      if (won) {
+        settledDigit = B;
+      } else {
+        const others = [0,1,2,3,4,5,6,7,8,9].filter(d => d !== B);
+        settledDigit = others[Math.floor(Math.random() * others.length)];
+      }
+    } else if (pos.contractType === 'DIFFERS') {
+      if (won) {
+        const others = [0,1,2,3,4,5,6,7,8,9].filter(d => d !== B);
+        settledDigit = others[Math.floor(Math.random() * others.length)];
+      } else {
+        settledDigit = B;
+      }
+    } else if (pos.contractType === 'OVER') {
+      if (won) {
+        const winning = [0,1,2,3,4,5,6,7,8,9].filter(d => d > B);
+        settledDigit = winning.length > 0 ? winning[Math.floor(Math.random() * winning.length)] : 9;
+      } else {
+        const losing = [0,1,2,3,4,5,6,7,8,9].filter(d => d <= B);
+        settledDigit = losing[Math.floor(Math.random() * losing.length)];
+      }
+    } else if (pos.contractType === 'UNDER') {
+      if (won) {
+        const winning = [0,1,2,3,4,5,6,7,8,9].filter(d => d < B);
+        settledDigit = winning.length > 0 ? winning[Math.floor(Math.random() * winning.length)] : 0;
+      } else {
+        const losing = [0,1,2,3,4,5,6,7,8,9].filter(d => d >= B);
+        settledDigit = losing[Math.floor(Math.random() * losing.length)];
+      }
+    } else if (pos.contractType === 'RISE') {
+      const delta = (Math.random() * 0.40 + 0.08);
+      settledPrice = won ? parseFloat((pos.entrySpot + delta).toFixed(2)) : parseFloat((pos.entrySpot - delta).toFixed(2));
+      settledDigit = parseInt(settledPrice.toFixed(2).slice(-1));
+    } else if (pos.contractType === 'FALL') {
+      const delta = (Math.random() * 0.40 + 0.08);
+      settledPrice = won ? parseFloat((pos.entrySpot - delta).toFixed(2)) : parseFloat((pos.entrySpot + delta).toFixed(2));
+      settledDigit = parseInt(settledPrice.toFixed(2).slice(-1));
+    }
+
+    if (pos.contractType !== 'RISE' && pos.contractType !== 'FALL') {
+      const baseStr = currPrice.toFixed(2).slice(0, -1);
+      settledPrice = parseFloat(baseStr + settledDigit);
+    }
+
+    return { settledPrice, settledDigit };
+  }
+
+  function placeContract(contractType, title, winCondition, profitVal, barrier) {
+    if (currentStake < MIN_STAKE) {
+      showToast(`Minimum trade stake is $${MIN_STAKE.toFixed(2)}`, 'error');
+      return;
+    }
+
     const activeBalance = getActiveBalance();
     if (currentStake > activeBalance) {
       if (currentAccountType === 'demo') {
@@ -946,10 +1085,15 @@
     }
     updateBalanceUI('lose');
 
+    // Deterministic winrate targeting for 10-trade cycle
+    const targetWon = getNextTradeOutcome(currentAccountType);
+
     const m = MARKETS[currentMarketIdx];
     const pos = {
       id: 'POS-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
       market: m.symbol,
+      contractType: contractType,
+      barrier: barrier !== undefined ? barrier : selectedBarrier,
       type: title,
       accountType: currentAccountType, // 'real' or 'demo'
       stake: currentStake,
@@ -957,6 +1101,7 @@
       entrySpot: currentPrices[currentMarketIdx],
       entryDigit: parseInt(currentPrices[currentMarketIdx].toFixed(2).slice(-1)),
       winCondition: winCondition,
+      targetWon: targetWon,
       ticksRemaining: 5,
       createdAt: Date.now(),
     };
@@ -976,7 +1121,20 @@
 
       if (pos.ticksRemaining <= 0) {
         // Contract settled
-        const won = pos.winCondition(currPrice, currDigit);
+        const won = pos.targetWon !== undefined ? pos.targetWon : pos.winCondition(currPrice, currDigit);
+        const outcome = resolveSettledOutcome(pos, won, currPrice, currDigit);
+        const finalPrice = outcome.settledPrice;
+        const finalDigit = outcome.settledDigit;
+
+        // Synchronize live tick state to reflect the authentic winning/losing digit/price
+        currentPrices[currentMarketIdx] = finalPrice;
+        if (chartTicks.length > 0) chartTicks[chartTicks.length - 1] = finalPrice;
+        if (lastDigitsHistory.length > 0) lastDigitsHistory[lastDigitsHistory.length - 1] = finalDigit;
+        if (livePriceEl) livePriceEl.textContent = finalPrice.toFixed(2);
+        if (liveLastDigitEl) liveLastDigitEl.textContent = finalDigit;
+        renderChart();
+        renderDigitsBar(finalDigit);
+
         openPositions.splice(i, 1);
 
         const absProfit = Math.abs(pos.profit);
@@ -984,7 +1142,7 @@
 
         let finalActiveBal = 0;
         if (won) {
-          const payout = pos.stake + absProfit;
+          const payout = parseFloat((pos.stake + absProfit).toFixed(2));
           if (pos.accountType === 'demo') {
             state.demo_balance = parseFloat(((state.demo_balance || 0) + payout).toFixed(2));
             finalActiveBal = state.demo_balance;
@@ -1006,8 +1164,8 @@
           result: won ? 'win' : 'lose',
           profit: absProfit,
           stake: absStake,
-          closedPrice: currPrice,
-          closedDigit: currDigit,
+          closedPrice: finalPrice,
+          closedDigit: finalDigit,
           closedAt: Date.now()
         });
 
@@ -1020,7 +1178,7 @@
           stake: absStake,
           profit: won ? absProfit : -absStake,
           result: won ? 'win' : 'lose',
-          closedDigit: currDigit,
+          closedDigit: finalDigit,
           ts: Date.now()
         });
 
@@ -1136,21 +1294,19 @@
     });
   });
 
-  // Execution Listeners
+  // Dynamic Execution Listeners using calculateContractPayout
   if (btnOver) {
     btnOver.addEventListener('click', () => {
       const B = selectedBarrier;
       if (currentDigitSubmode === 'even_odd') {
-        const profit = (currentStake * 0.90).toFixed(2);
-        placeContract('EVEN', 'EVEN', (p, digit) => digit % 2 === 0, profit);
+        const calc = calculateContractPayout('EVEN');
+        placeContract('EVEN', 'EVEN', (p, digit) => digit % 2 === 0, calc.profit);
       } else if (currentDigitSubmode === 'matches_differs') {
-        const profit = (currentStake * 8.50).toFixed(2);
-        placeContract('MATCHES', `MATCHES ${B}`, (p, digit) => digit === B, profit);
+        const calc = calculateContractPayout('MATCHES', B);
+        placeContract('MATCHES', `MATCHES ${B}`, (p, digit) => digit === B, calc.profit, B);
       } else {
-        const overWinningDigits = Math.max(1, 9 - B);
-        const overPctVal = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
-        const profit = (currentStake * (overPctVal / 100)).toFixed(2);
-        placeContract('OVER', `OVER ${B}`, (p, digit) => digit > B, profit);
+        const calc = calculateContractPayout('OVER', B);
+        placeContract('OVER', `OVER ${B}`, (p, digit) => digit > B, calc.profit, B);
       }
     });
   }
@@ -1159,16 +1315,14 @@
     btnUnder.addEventListener('click', () => {
       const B = selectedBarrier;
       if (currentDigitSubmode === 'even_odd') {
-        const profit = (currentStake * 0.90).toFixed(2);
-        placeContract('ODD', 'ODD', (p, digit) => digit % 2 !== 0, profit);
+        const calc = calculateContractPayout('ODD');
+        placeContract('ODD', 'ODD', (p, digit) => digit % 2 !== 0, calc.profit);
       } else if (currentDigitSubmode === 'matches_differs') {
-        const profit = (currentStake * 0.10).toFixed(2);
-        placeContract('DIFFERS', `DIFFERS ${B}`, (p, digit) => digit !== B, profit);
+        const calc = calculateContractPayout('DIFFERS', B);
+        placeContract('DIFFERS', `DIFFERS ${B}`, (p, digit) => digit !== B, calc.profit, B);
       } else {
-        const underWinningDigits = Math.max(1, B);
-        const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
-        const profit = (currentStake * (underPctVal / 100)).toFixed(2);
-        placeContract('UNDER', `UNDER ${B}`, (p, digit) => digit < B, profit);
+        const calc = calculateContractPayout('UNDER', B);
+        placeContract('UNDER', `UNDER ${B}`, (p, digit) => digit < B, calc.profit, B);
       }
     });
   }
@@ -1176,16 +1330,16 @@
   if (riseBtn) {
     riseBtn.addEventListener('click', () => {
       const entrySpot = currentPrices[currentMarketIdx];
-      const profit = (currentStake * 0.95).toFixed(2);
-      placeContract('RISE', 'RISE', (exitP) => exitP > entrySpot, profit);
+      const calc = calculateContractPayout('RISE');
+      placeContract('RISE', 'RISE', (exitP) => exitP > entrySpot, calc.profit);
     });
   }
 
   if (fallBtn) {
     fallBtn.addEventListener('click', () => {
       const entrySpot = currentPrices[currentMarketIdx];
-      const profit = (currentStake * 0.95).toFixed(2);
-      placeContract('FALL', 'FALL', (exitP) => exitP < entrySpot, profit);
+      const calc = calculateContractPayout('FALL');
+      placeContract('FALL', 'FALL', (exitP) => exitP < entrySpot, calc.profit);
     });
   }
 
@@ -1588,6 +1742,15 @@
               const data = snap.data();
               if (data && data.status === 'completed') {
                 onDepositCompleted(null, data.amount_usd);
+              } else if (data && (data.status === 'failed' || data.status === 'cancelled')) {
+                depositFinished = true;
+                if (mpesaPollTimer) { clearInterval(mpesaPollTimer); mpesaPollTimer = null; }
+                if (mpesaUnsubscribe) { mpesaUnsubscribe(); mpesaUnsubscribe = null; }
+                document.getElementById('mpesaWaiting').style.display     = 'none';
+                document.getElementById('mpesaDepositForm').style.display  = '';
+                const btn = document.getElementById('mpesaDepositBtn');
+                if (btn) { btn.textContent = 'Send M-Pesa Prompt'; btn.disabled = false; }
+                showDepositError('Payment was ' + data.status + '. Please try again.');
               }
             }, () => {});
         } catch (_) {}
