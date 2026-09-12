@@ -159,7 +159,9 @@
      4. FORMATTERS & UI SYNCS
   ══════════════════════════════════════════════════════ */
   function fmt(n) {
-    return '$' + Number(n).toLocaleString('en-US', {
+    const val = Number(n) || 0;
+    const sign = val < 0 ? '−' : '';
+    return sign + '$' + Math.abs(val).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
@@ -836,7 +838,7 @@
       market: m.symbol,
       type: title,
       stake: currentStake,
-      profit: parseFloat(profitVal),
+      profit: Math.abs(parseFloat(profitVal) || 0),
       entrySpot: currentPrices[currentMarketIdx],
       entryDigit: parseInt(currentPrices[currentMarketIdx].toFixed(2).slice(-1)),
       winCondition: winCondition,
@@ -861,20 +863,25 @@
         const won = pos.winCondition(currPrice, currDigit);
         openPositions.splice(i, 1);
 
+        const absProfit = Math.abs(pos.profit);
+        const absStake  = Math.abs(pos.stake);
+
         if (won) {
-          const payout = pos.stake + pos.profit;
+          const payout = pos.stake + absProfit;
           state.balance = parseFloat((state.balance + payout).toFixed(2));
           updateBalanceUI('win');
-          showResultOverlay(true, pos.stake, pos.profit, state.balance);
+          showResultOverlay(true, absStake, absProfit, state.balance);
         } else {
-          showResultOverlay(false, pos.stake, pos.profit, state.balance);
+          showResultOverlay(false, absStake, absProfit, state.balance);
           updateBalanceUI('lose');
         }
 
-        // Add to closed positions
+        // Add to closed positions (displayed directly below open positions on the left sidebar!)
         closedPositions.unshift({
           ...pos,
           result: won ? 'win' : 'lose',
+          profit: absProfit,
+          stake: absStake,
           closedPrice: currPrice,
           closedDigit: currDigit,
           closedAt: Date.now()
@@ -885,9 +892,10 @@
           type: 'trade',
           market: pos.market,
           direction: pos.type,
-          stake: pos.stake,
-          profit: won ? pos.profit : -pos.stake,
+          stake: absStake,
+          profit: won ? absProfit : -absStake,
           result: won ? 'win' : 'lose',
+          closedDigit: currDigit,
           ts: Date.now()
         });
 
@@ -898,77 +906,110 @@
     renderPositions();
   }
 
+  function formatRelativeTime(ts) {
+    if (!ts) return 'Recent';
+    const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (diffSec < 5) return 'Just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    return `${Math.floor(diffMin / 60)}h ago`;
+  }
+
   function renderPositions() {
     if (openCountEl) openCountEl.textContent = openPositions.length;
     if (closedCountEl) closedCountEl.textContent = closedPositions.length;
 
-    // Open positions
+    // Mobile badge update
+    const mobOpenBadge = document.getElementById('mobOpenBadge');
+    if (mobOpenBadge) {
+      mobOpenBadge.textContent = openPositions.length;
+      mobOpenBadge.style.display = openPositions.length > 0 ? 'inline-flex' : 'none';
+    }
+
+    // 1. TOP: Open positions
     if (openPositions.length === 0) {
       if (openPositionsEmpty) openPositionsEmpty.style.display = 'block';
-      if (openPositionsList) openPositionsList.style.display = 'none';
+      if (openPositionsList) {
+        openPositionsList.style.display = 'none';
+        openPositionsList.innerHTML = '';
+      }
     } else {
       if (openPositionsEmpty) openPositionsEmpty.style.display = 'none';
       if (openPositionsList) {
-        openPositionsList.style.display = 'block';
+        openPositionsList.style.display = 'flex';
         openPositionsList.innerHTML = openPositions.map(p => `
-          <div class="st-position-card">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;font-weight:700;">
-              <span>${p.type}</span>
-              <span style="color:#a78bfa;">${p.ticksRemaining} ticks</span>
+          <div class="st-position-card open">
+            <div class="st-pos-card-head">
+              <span class="st-pos-type-badge">${p.type}</span>
+              <span class="st-pos-timer"><span class="st-live-dot-sm"></span> ${p.ticksRemaining} ticks</span>
             </div>
-            <div style="font-size:0.75rem;color:var(--st-text-dim);margin-top:4px;">
-              ${p.market} &bull; Stake: ${fmt(p.stake)}
+            <div class="st-pos-card-body">
+              <span>${p.market} &bull; Entry: <strong>${p.entryDigit !== undefined ? p.entryDigit : p.entrySpot}</strong></span>
+              <span class="st-pos-stake">Stake: <strong>${fmt(p.stake)}</strong></span>
+            </div>
+            <div class="st-pos-progress-bar">
+              <div class="st-pos-progress-fill" style="width:${((5 - p.ticksRemaining) / 5) * 100}%"></div>
             </div>
           </div>
         `).join('');
       }
     }
 
-    // Closed positions
+    // 2. BELOW: Recent Results (Closed Positions)
     if (closedPositions.length === 0) {
       if (closedPositionsEmpty) closedPositionsEmpty.style.display = 'block';
-      if (closedPositionsList) closedPositionsList.style.display = 'none';
+      if (closedPositionsList) {
+        closedPositionsList.style.display = 'none';
+        closedPositionsList.innerHTML = '';
+      }
     } else {
       if (closedPositionsEmpty) closedPositionsEmpty.style.display = 'none';
       if (closedPositionsList) {
-        closedPositionsList.style.display = 'block';
-        closedPositionsList.innerHTML = closedPositions.slice(0, 15).map(p => `
-          <div class="st-position-card ${p.result}">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;font-weight:700;">
-              <span>${p.type}</span>
-              <span style="color:${p.result === 'win' ? 'var(--st-neon-green)' : 'var(--st-red)'};">
-                ${p.result === 'win' ? '+' + fmt(p.profit) : '−' + fmt(p.stake)}
-              </span>
+        closedPositionsList.style.display = 'flex';
+        closedPositionsList.innerHTML = closedPositions.slice(0, 20).map(p => {
+          const isWin = p.result === 'win';
+          const profitVal = Math.abs(Number(p.profit) || 0);
+          const stakeVal = Math.abs(Number(p.stake) || 0);
+          const timeStr = formatRelativeTime(p.closedAt);
+          return `
+            <div class="st-position-card ${isWin ? 'win' : 'lose'}">
+              <div class="st-pos-card-head">
+                <span class="st-pos-type-badge ${isWin ? 'win' : 'lose'}">${p.type}</span>
+                <span class="st-pos-result-amt ${isWin ? 'win' : 'lose'}">
+                  ${isWin ? '+' + fmt(profitVal) : '−' + fmt(stakeVal)}
+                </span>
+              </div>
+              <div class="st-pos-card-body">
+                <span>${p.market} &bull; Final: <strong>${p.closedDigit !== undefined ? p.closedDigit : '-'}</strong></span>
+                <span class="st-pos-status-tag ${isWin ? 'win' : 'lose'}">${isWin ? 'WON' : 'LOST'}</span>
+              </div>
+              <div class="st-pos-card-footer">
+                <span class="st-pos-time">${timeStr}</span>
+                <span class="st-pos-entry-info">Entry: ${p.entryDigit !== undefined ? p.entryDigit : '-'}</span>
+              </div>
             </div>
-            <div style="font-size:0.74rem;color:var(--st-text-dim);margin-top:4px;">
-              ${p.market} &bull; Final Digit: ${p.closedDigit}
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       }
     }
   }
 
-  // Position tabs toggling
-  if (tabOpenPositions && tabClosedPositions) {
-    tabOpenPositions.addEventListener('click', () => {
-      tabOpenPositions.classList.add('active');
-      tabClosedPositions.classList.remove('active');
-      if (openPositionsList) openPositionsList.style.display = openPositions.length ? 'block' : 'none';
-      if (openPositionsEmpty) openPositionsEmpty.style.display = openPositions.length ? 'none' : 'block';
-      if (closedPositionsList) closedPositionsList.style.display = 'none';
-      if (closedPositionsEmpty) closedPositionsEmpty.style.display = 'none';
+  // Mobile navigation button listeners
+  document.querySelectorAll('.st-mob-nav-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.st-mob-nav-btn[data-tab]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      let targetEl = null;
+      if (tab === 'chart') targetEl = document.getElementById('chartCol');
+      else if (tab === 'trade') targetEl = document.getElementById('tradingPanelCol');
+      else if (tab === 'positions') targetEl = document.getElementById('positionsSidebar');
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
-
-    tabClosedPositions.addEventListener('click', () => {
-      tabClosedPositions.classList.add('active');
-      tabOpenPositions.classList.remove('active');
-      if (openPositionsList) openPositionsList.style.display = 'none';
-      if (openPositionsEmpty) openPositionsEmpty.style.display = 'none';
-      if (closedPositionsList) closedPositionsList.style.display = closedPositions.length ? 'block' : 'none';
-      if (closedPositionsEmpty) closedPositionsEmpty.style.display = closedPositions.length ? 'none' : 'block';
-    });
-  }
+  });
 
   // Execution Listeners
   if (btnOver) {
@@ -1049,25 +1090,28 @@
   function showResultOverlay(won, stake, profit, newBalance) {
     if (!resultOverlay) return;
 
-    const iconEl    = resultOverlay.querySelector('#resultIcon');
-    const titleEl   = resultOverlay.querySelector('#resultTitle');
-    const subEl     = resultOverlay.querySelector('#resultSub');
-    const amountEl  = resultOverlay.querySelector('#resultAmount');
-    const labelEl   = resultOverlay.querySelector('#resultAmountLabel');
+    const iconEl     = resultOverlay.querySelector('#resultIcon');
+    const titleEl    = resultOverlay.querySelector('#resultTitle');
+    const subEl      = resultOverlay.querySelector('#resultSub');
+    const amountEl   = resultOverlay.querySelector('#resultAmount');
+    const labelEl    = resultOverlay.querySelector('#resultAmountLabel');
     const balanceEl2 = resultOverlay.querySelector('#resultNewBalance');
 
+    const absProfit = Math.abs(Number(profit) || 0);
+    const absStake  = Math.abs(Number(stake) || 0);
+
     if (won) {
-      if (iconEl)   { iconEl.innerHTML = '<i data-lucide="award" class="lucide-xl" style="color:var(--positive);"></i>'; }
+      if (iconEl)   { iconEl.innerHTML = '<i data-lucide="award" class="lucide-xl" style="color:var(--st-neon-green);"></i>'; }
       if (titleEl)  { titleEl.textContent = 'You Won!'; titleEl.className = 'result-title win'; }
       if (subEl)    subEl.textContent    = 'Your prediction was correct.';
       if (labelEl)  labelEl.textContent  = 'Profit Credited';
-      if (amountEl) { amountEl.textContent = '+' + fmt(profit); amountEl.className = 'result-amount-value win'; }
+      if (amountEl) { amountEl.textContent = '+' + fmt(absProfit); amountEl.className = 'result-amount-value win'; }
     } else {
-      if (iconEl)   { iconEl.innerHTML = '<i data-lucide="trending-down" class="lucide-xl" style="color:var(--negative);"></i>'; }
+      if (iconEl)   { iconEl.innerHTML = '<i data-lucide="trending-down" class="lucide-xl" style="color:var(--st-red);"></i>'; }
       if (titleEl)  { titleEl.textContent = 'Better Luck Next Time'; titleEl.className = 'result-title lose'; }
       if (subEl)    subEl.textContent    = 'The market moved against you.';
       if (labelEl)  labelEl.textContent  = 'Stake Lost';
-      if (amountEl) { amountEl.textContent = '−' + fmt(stake); amountEl.className = 'result-amount-value lose'; }
+      if (amountEl) { amountEl.textContent = '−' + fmt(absStake); amountEl.className = 'result-amount-value lose'; }
     }
 
     if (window.lucide) lucide.createIcons();

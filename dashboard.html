@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="css/dashboard.css?v=2.0.0" />
+  <link rel="stylesheet" href="css/dashboard.css?v=2.2.0" />
 </head>
 <body class="dashboard-body">
 
@@ -94,32 +94,48 @@
   ══════════════════════════════════════ -->
   <main class="st-workspace" id="main-content">
 
-    <!-- 1. LEFT COLUMN: POSITIONS DRAWER -->
-    <aside class="st-positions-col" aria-label="Positions">
+    <!-- 1. LEFT COLUMN: POSITIONS & RECENT RESULTS -->
+    <aside class="st-positions-col" id="positionsSidebar" aria-label="Positions and Trade Results">
       <div class="st-positions-header">
-        <button class="st-pos-tab active" data-pos-tab="open" id="tabOpenPositions">
-          Open (<span id="openCount">0</span>)
-        </button>
-        <button class="st-pos-tab" data-pos-tab="closed" id="tabClosedPositions">
-          Closed (<span id="closedCount">0</span>)
-        </button>
+        <span class="st-sidebar-title">
+          <i data-lucide="layers" class="lucide-xs"></i>
+          <span>Trades &amp; Results</span>
+        </span>
       </div>
 
       <div class="st-positions-body">
-        <div class="st-positions-empty" id="openPositionsEmpty">
-          <p>No open positions yet.</p>
+        <!-- TOP: Open Positions -->
+        <div class="st-pos-group">
+          <div class="st-pos-group-head">
+            <span class="st-pos-group-title">
+              <span class="st-live-dot-sm"></span> OPEN POSITIONS
+            </span>
+            <span class="st-pos-badge" id="openCount">0</span>
+          </div>
+          <div class="st-positions-list" id="openPositionsList" style="display:none;"></div>
+          <div class="st-positions-empty" id="openPositionsEmpty">
+            <p>No open positions yet.</p>
+          </div>
         </div>
-        <div class="st-positions-list" id="openPositionsList" style="display:none;"></div>
 
-        <div class="st-positions-empty" id="closedPositionsEmpty" style="display:none;">
-          <p>No closed positions yet.</p>
+        <!-- BELOW: Recent Results (Closed Trades) -->
+        <div class="st-pos-group st-results-group">
+          <div class="st-pos-group-head">
+            <span class="st-pos-group-title">
+              <i data-lucide="history" class="lucide-xs"></i> RECENT RESULTS
+            </span>
+            <span class="st-pos-badge" id="closedCount">0</span>
+          </div>
+          <div class="st-positions-list" id="closedPositionsList" style="display:none;"></div>
+          <div class="st-positions-empty" id="closedPositionsEmpty">
+            <p>No trade results yet.</p>
+          </div>
         </div>
-        <div class="st-positions-list" id="closedPositionsList" style="display:none;"></div>
       </div>
     </aside>
 
     <!-- 2. CENTER COLUMN: CHART & DIGITS WORKSPACE -->
-    <section class="st-chart-col" aria-label="Market Chart and Analytics">
+    <section class="st-chart-col" id="chartCol" aria-label="Market Chart and Analytics">
       <!-- Market Info Header -->
       <div class="st-market-header">
         <div class="st-market-title-wrap">
@@ -206,7 +222,7 @@
     </section>
 
     <!-- 3. RIGHT COLUMN: TRADING EXECUTION PANEL -->
-    <aside class="st-trade-col" aria-label="Trade Execution">
+    <aside class="st-trade-col" id="tradingPanelCol" aria-label="Trade Execution">
       <div class="st-trade-card">
         <!-- Mode Switcher: Manual / Auto / AI -->
         <div class="st-mode-row">
@@ -537,6 +553,29 @@
   </div>
 
   <!-- ══════════════════════════════════════
+       MOBILE BOTTOM NAVIGATION BAR
+  ══════════════════════════════════════ -->
+  <nav class="st-mobile-nav" id="mobileBottomNav" aria-label="Mobile Navigation">
+    <button class="st-mob-nav-btn active" data-tab="chart">
+      <i data-lucide="line-chart" class="lucide-sm"></i>
+      <span>Chart</span>
+    </button>
+    <button class="st-mob-nav-btn" data-tab="trade">
+      <i data-lucide="trending-up" class="lucide-sm"></i>
+      <span>Trade</span>
+    </button>
+    <button class="st-mob-nav-btn" data-tab="positions">
+      <i data-lucide="layers" class="lucide-sm"></i>
+      <span>Trades</span>
+      <span class="st-mob-pos-badge" id="mobOpenBadge" style="display:none;">0</span>
+    </button>
+    <button class="st-mob-nav-btn st-mob-deposit" data-open-deposit>
+      <i data-lucide="plus-circle" class="lucide-sm"></i>
+      <span>Deposit</span>
+    </button>
+  </nav>
+
+  <!-- ══════════════════════════════════════
        TOAST CONTAINER
   ══════════════════════════════════════ -->
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
@@ -549,6 +588,6 @@
   <!-- EliteTrades -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="js/firebase-config.js?v=1.1.0"></script>
-  <script src="js/dashboard.js?v=2.1.0"></script>
+  <script src="js/dashboard.js?v=2.2.0"></script>
 </body>
 </html>
