@@ -781,15 +781,11 @@
     }).render('#paypal-button-container');
   }
 
-  /* ─── M-Pesa number validator (Safaricom only) ─────── */
-  // Channel 11753 is Safaricom M-Pesa — 07xx and 011x only
+  /* ─── M-Pesa number validator ──────────────────────── */
+  // Accepts all Kenyan M-Pesa formats: 07xxxxxxxx, 01xxxxxxxx, +2547..., +2541...
   function validateMpesa(num) {
     const n = num.replace(/\s+/g, '');
-    // 07xxxxxxxx — all Safaricom 07x
-    // 011xxxxxxx — Safaricom 011 series
-    // +2547x / 2547x — international Safaricom
-    // +25411 / 25411 — international Safaricom 011
-    return /^(\+?2547\d{8}|\+?25411\d{7}|07\d{8}|011\d{7})$/.test(n);
+    return /^(\+?254[17]\d{8}|0[17]\d{8})$/.test(n);
   }
 
   /* ═══════════════════════════════════════════════════════════
