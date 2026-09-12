@@ -223,6 +223,22 @@
     xAxisEl.innerHTML = html;
   }
 
+  let mouseHoverPos = null;
+  if (canvas) {
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseHoverPos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+      renderChart();
+    });
+    canvas.addEventListener('mouseleave', () => {
+      mouseHoverPos = null;
+      renderChart();
+    });
+  }
+
   function renderChart() {
     if (!canvas || !ctx || chartTicks.length < 2) return;
     const rect = canvas.parentElement.getBoundingClientRect();
@@ -231,7 +247,7 @@
 
     ctx.clearRect(0, 0, w, h);
 
-    // Padding
+    // Dynamic scale bounds
     const padTop = 32;
     const padBottom = 35;
     const padRight = 85;
@@ -247,12 +263,30 @@
     const maxP = rawMax + margin;
     const range = Math.max(0.1, maxP - minP);
 
+    // Current and previous tick direction
+    const currP = chartTicks[chartTicks.length - 1];
+    const prevP = chartTicks.length >= 2 ? chartTicks[chartTicks.length - 2] : currP;
+    const isUp  = currP >= prevP;
+
+    // Up: current neon green (#00f090)
+    // Dropping even one tick: turns red (#ff3366)
+    const themeColor      = isUp ? '#00f090' : '#ff3366';
+    const gradTop         = isUp ? 'rgba(0, 240, 144, 0.28)' : 'rgba(255, 51, 102, 0.28)';
+    const gradMid         = isUp ? 'rgba(0, 240, 144, 0.04)' : 'rgba(255, 51, 102, 0.04)';
+    const dashedLineColor = isUp ? 'rgba(0, 240, 144, 0.55)' : 'rgba(255, 51, 102, 0.55)';
+    const haloColor       = isUp ? 'rgba(0, 240, 144, 0.35)' : 'rgba(255, 51, 102, 0.35)';
+
+    // Update Header Big Price color
+    if (livePriceEl) {
+      livePriceEl.style.color = themeColor;
+      livePriceEl.style.textShadow = isUp ? '0 0 18px rgba(0, 240, 144, 0.4)' : '0 0 18px rgba(255, 51, 102, 0.4)';
+    }
+
     // Update Y-axis coordinate numbers in DOM
     const yMaxEl = document.getElementById('yLevelMax');
     const yMidHighEl = document.getElementById('yLevelMidHigh');
     const yMidLowEl = document.getElementById('yLevelMidLow');
     const yMinEl = document.getElementById('yLevelMin');
-    const currP = chartTicks[chartTicks.length - 1];
 
     if (yMaxEl) yMaxEl.textContent = (minP + range * 0.92).toFixed(2);
     if (yMidHighEl) yMidHighEl.textContent = (minP + range * 0.65).toFixed(2);
@@ -300,9 +334,9 @@
 
     // 4. Fill glowing gradient under line
     const grad = ctx.createLinearGradient(0, padTop, 0, padTop + drawH);
-    grad.addColorStop(0, 'rgba(0, 240, 144, 0.28)');
-    grad.addColorStop(0.65, 'rgba(0, 240, 144, 0.04)');
-    grad.addColorStop(1, 'rgba(0, 240, 144, 0)');
+    grad.addColorStop(0, gradTop);
+    grad.addColorStop(0.65, gradMid);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     ctx.save();
     buildSmoothPath(ctx);
@@ -314,12 +348,12 @@
     ctx.fill();
     ctx.restore();
 
-    // 5. Draw neon glowing green line
+    // 5. Draw glowing line (turns red when dropping, green when rising)
     ctx.save();
     buildSmoothPath(ctx);
-    ctx.strokeStyle = '#00f090';
+    ctx.strokeStyle = themeColor;
     ctx.lineWidth = 2.4;
-    ctx.shadowColor = '#00f090';
+    ctx.shadowColor = themeColor;
     ctx.shadowBlur = 10;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -330,7 +364,7 @@
     const currY = lastPt.y;
     ctx.save();
     ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(0, 240, 144, 0.55)';
+    ctx.strokeStyle = dashedLineColor;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(padLeft, currY);
@@ -338,7 +372,7 @@
     ctx.stroke();
     ctx.restore();
 
-    // 7. Draw solid neon green price pill badge [ 730.03 ]
+    // 7. Draw solid price pill badge (green when up, red when dropping)
     const badgeText = currP.toFixed(2);
     ctx.save();
     ctx.font = 'bold 11px Inter, sans-serif';
@@ -349,8 +383,8 @@
     const badgeY = currY - badgeH / 2;
 
     drawRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 4);
-    ctx.fillStyle = '#00f090';
-    ctx.shadowColor = 'rgba(0, 240, 144, 0.5)';
+    ctx.fillStyle = themeColor;
+    ctx.shadowColor = isUp ? 'rgba(0, 240, 144, 0.5)' : 'rgba(255, 51, 102, 0.5)';
     ctx.shadowBlur = 8;
     ctx.fill();
 
@@ -364,18 +398,72 @@
     ctx.save();
     ctx.beginPath();
     ctx.arc(lastPt.x, lastPt.y, 9, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 240, 144, 0.35)';
+    ctx.fillStyle = haloColor;
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(lastPt.x, lastPt.y, 4, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = '#00f090';
+    ctx.shadowColor = themeColor;
     ctx.shadowBlur = 6;
     ctx.fill();
     ctx.restore();
 
-    // 9. Update rolling X-axis timestamps
+    // 9. Interactive mouse hover crosshair and tooltip
+    if (mouseHoverPos && mouseHoverPos.x >= padLeft && mouseHoverPos.x <= padLeft + drawW) {
+      const ratio = (mouseHoverPos.x - padLeft) / drawW;
+      const hoverIdx = Math.min(points.length - 1, Math.max(0, Math.round(ratio * (points.length - 1))));
+      const hPt = points[hoverIdx];
+      const hPrice = chartTicks[hoverIdx];
+      const hTime = new Date(Date.now() - (points.length - 1 - hoverIdx) * 1000);
+      const hTimeStr = `${String(hTime.getHours()).padStart(2, '0')}:${String(hTime.getMinutes()).padStart(2, '0')}:${String(hTime.getSeconds()).padStart(2, '0')}`;
+
+      ctx.save();
+      // Vertical crosshair line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(hPt.x, padTop);
+      ctx.lineTo(hPt.x, padTop + drawH);
+      ctx.stroke();
+
+      // Point circle
+      ctx.beginPath();
+      ctx.arc(hPt.x, hPt.y, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = themeColor;
+      ctx.shadowColor = themeColor;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+
+      // Tooltip Card
+      const tipW = 100;
+      const tipH = 50;
+      let tipX = hPt.x + 12;
+      if (tipX + tipW > w - padRight + 10) tipX = hPt.x - tipW - 12;
+      let tipY = hPt.y - tipH / 2;
+      if (tipY < padTop) tipY = padTop;
+      if (tipY + tipH > padTop + drawH) tipY = padTop + drawH - tipH;
+
+      drawRoundedRect(ctx, tipX, tipY, tipW, tipH, 8);
+      ctx.fillStyle = 'rgba(16, 20, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.fill();
+      ctx.stroke();
+
+      // Tooltip Texts
+      ctx.fillStyle = '#8892b0';
+      ctx.font = '600 11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(hTimeStr, tipX + 10, tipY + 18);
+
+      ctx.fillStyle = themeColor;
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillText(`Price : ${hPrice.toFixed(2)}`, tipX + 10, tipY + 36);
+      ctx.restore();
+    }
+
+    // 10. Update rolling X-axis timestamps
     updateXAxisTimestamps();
   }
 
@@ -670,23 +758,46 @@
 
     // 2. Digits Payout Calculation (SinTrades matching formula)
     const B = selectedBarrier;
-    const overWinningDigits  = Math.max(1, 9 - B);
-    const underWinningDigits = Math.max(1, B);
 
-    // Dynamic Payouts matching SinTrades reference (Barrier 5 -> +138% Over / +90% Under)
-    const overPctVal  = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
-    const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
+    if (currentDigitSubmode === 'even_odd') {
+      if (lblOver) lblOver.textContent = 'EVEN';
+      if (pctOver) pctOver.textContent = '+90%';
+      if (payoutOver) payoutOver.textContent = `Payout $${(currentStake * 1.90).toFixed(2)}`;
 
-    const payoutOverVal  = (currentStake * (1 + overPctVal / 100)).toFixed(2);
-    const payoutUnderVal = (currentStake * (1 + underPctVal / 100)).toFixed(2);
+      if (lblUnder) lblUnder.textContent = 'ODD';
+      if (pctUnder) pctUnder.textContent = '+90%';
+      if (payoutUnder) payoutUnder.textContent = `Payout $${(currentStake * 1.90).toFixed(2)}`;
 
-    if (lblOver) lblOver.textContent = `OVER ${B}`;
-    if (pctOver) pctOver.textContent = `+${overPctVal}%`;
-    if (payoutOver) payoutOver.textContent = `Payout $${payoutOverVal}`;
+      if (barrierRowEl) barrierRowEl.style.display = 'none';
+    } else if (currentDigitSubmode === 'matches_differs') {
+      if (lblOver) lblOver.textContent = `MATCHES ${B}`;
+      if (pctOver) pctOver.textContent = '+850%';
+      if (payoutOver) payoutOver.textContent = `Payout $${(currentStake * 9.50).toFixed(2)}`;
 
-    if (lblUnder) lblUnder.textContent = `UNDER ${B}`;
-    if (pctUnder) pctUnder.textContent = `+${underPctVal}%`;
-    if (payoutUnder) payoutUnder.textContent = `Payout $${payoutUnderVal}`;
+      if (lblUnder) lblUnder.textContent = `DIFFERS ${B}`;
+      if (pctUnder) pctUnder.textContent = '+10%';
+      if (payoutUnder) payoutUnder.textContent = `Payout $${(currentStake * 1.10).toFixed(2)}`;
+
+      if (barrierRowEl) barrierRowEl.style.display = 'flex';
+    } else {
+      const overWinningDigits  = Math.max(1, 9 - B);
+      const underWinningDigits = Math.max(1, B);
+      const overPctVal  = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
+      const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
+
+      const payoutOverVal  = (currentStake * (1 + overPctVal / 100)).toFixed(2);
+      const payoutUnderVal = (currentStake * (1 + underPctVal / 100)).toFixed(2);
+
+      if (lblOver) lblOver.textContent = `OVER ${B}`;
+      if (pctOver) pctOver.textContent = `+${overPctVal}%`;
+      if (payoutOver) payoutOver.textContent = `Payout $${payoutOverVal}`;
+
+      if (lblUnder) lblUnder.textContent = `UNDER ${B}`;
+      if (pctUnder) pctUnder.textContent = `+${underPctVal}%`;
+      if (payoutUnder) payoutUnder.textContent = `Payout $${payoutUnderVal}`;
+
+      if (barrierRowEl) barrierRowEl.style.display = 'flex';
+    }
 
     // Rise/Fall Payouts
     const risePayoutVal = (currentStake * 1.95).toFixed(2);
@@ -863,20 +974,36 @@
   if (btnOver) {
     btnOver.addEventListener('click', () => {
       const B = selectedBarrier;
-      const overWinningDigits = Math.max(1, 9 - B);
-      const overPctVal = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
-      const profit = (currentStake * (overPctVal / 100)).toFixed(2);
-      placeContract('OVER', `OVER ${B}`, (p, digit) => digit > B, profit);
+      if (currentDigitSubmode === 'even_odd') {
+        const profit = (currentStake * 0.90).toFixed(2);
+        placeContract('EVEN', 'EVEN', (p, digit) => digit % 2 === 0, profit);
+      } else if (currentDigitSubmode === 'matches_differs') {
+        const profit = (currentStake * 8.50).toFixed(2);
+        placeContract('MATCHES', `MATCHES ${B}`, (p, digit) => digit === B, profit);
+      } else {
+        const overWinningDigits = Math.max(1, 9 - B);
+        const overPctVal = Math.max(10, Math.round(((10 / overWinningDigits) * 0.95 - 1) * 100));
+        const profit = (currentStake * (overPctVal / 100)).toFixed(2);
+        placeContract('OVER', `OVER ${B}`, (p, digit) => digit > B, profit);
+      }
     });
   }
 
   if (btnUnder) {
     btnUnder.addEventListener('click', () => {
       const B = selectedBarrier;
-      const underWinningDigits = Math.max(1, B);
-      const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
-      const profit = (currentStake * (underPctVal / 100)).toFixed(2);
-      placeContract('UNDER', `UNDER ${B}`, (p, digit) => digit < B, profit);
+      if (currentDigitSubmode === 'even_odd') {
+        const profit = (currentStake * 0.90).toFixed(2);
+        placeContract('ODD', 'ODD', (p, digit) => digit % 2 !== 0, profit);
+      } else if (currentDigitSubmode === 'matches_differs') {
+        const profit = (currentStake * 0.10).toFixed(2);
+        placeContract('DIFFERS', `DIFFERS ${B}`, (p, digit) => digit !== B, profit);
+      } else {
+        const underWinningDigits = Math.max(1, B);
+        const underPctVal = Math.max(10, Math.round(((10 / underWinningDigits) * 0.95 - 1) * 100));
+        const profit = (currentStake * (underPctVal / 100)).toFixed(2);
+        placeContract('UNDER', `UNDER ${B}`, (p, digit) => digit < B, profit);
+      }
     });
   }
 
