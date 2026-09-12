@@ -254,7 +254,9 @@ body.dashboard-body {
 ══════════════════════════════════════════════════════════════ */
 .st-workspace {
   display: flex;
-  min-height: calc(100vh - 60px);
+  height: calc(100vh - 60px);
+  max-height: calc(100vh - 60px);
+  overflow: hidden;
   background-color: var(--st-bg);
 }
 
@@ -266,6 +268,8 @@ body.dashboard-body {
   border-right: 1px solid var(--st-border);
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .st-positions-header {
@@ -330,6 +334,8 @@ body.dashboard-body {
   flex-direction: column;
   background-color: var(--st-bg);
   border-right: 1px solid var(--st-border);
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Market Header Bar */
@@ -525,7 +531,7 @@ body.dashboard-body {
 .st-chart-container {
   flex: 1;
   position: relative;
-  min-height: 380px;
+  min-height: 200px;
   width: 100%;
   overflow: hidden;
   background-color: #0b0e17;
@@ -581,7 +587,8 @@ body.dashboard-body {
 .st-digits-bar {
   background-color: rgba(16, 20, 32, 0.75);
   border-top: 1px solid var(--st-border);
-  padding: 16px 24px;
+  padding: 8px 24px 12px 24px;
+  flex-shrink: 0;
 }
 
 .st-digits-bar-header {
@@ -609,7 +616,8 @@ body.dashboard-body {
 .st-digits-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  gap: 8px;
+  gap: 6px;
+  align-items: center;
 }
 
 .st-digit-card {
@@ -617,34 +625,93 @@ body.dashboard-body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 4px;
-  background-color: rgba(255, 255, 255, 0.03);
-  border: 1.5px solid var(--st-border);
+  padding: 6px 2px 8px 2px;
+  background-color: transparent;
+  border: 1.5px solid transparent;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  position: relative;
 }
 
 .st-digit-card:hover {
-  background-color: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  background-color: rgba(255, 255, 255, 0.04);
 }
 
-.st-digit-circle {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+.st-digit-indicator {
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  margin-bottom: 2px;
+  color: transparent;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.st-digit-card.is-current .st-digit-indicator {
+  color: #a78bfa;
+}
+
+.st-digit-gauge-wrap {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.st-digit-gauge-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 38px;
+  height: 38px;
+  transform: rotate(-90deg);
+}
+
+.st-digit-gauge-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 2.4;
+}
+
+.st-digit-gauge-fill {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.st-digit-num-center {
+  position: relative;
+  z-index: 2;
+  font-size: 1rem;
   font-weight: 800;
   color: #ffffff;
-  margin-bottom: 6px;
-  transition: all 0.2s ease;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Active Highlight (Current Last Digit) */
+.st-digit-card.is-current .st-digit-gauge-wrap {
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(167, 139, 250, 0.8), inset 0 0 8px rgba(167, 139, 250, 0.4);
+  background-color: rgba(124, 58, 237, 0.25);
+}
+
+.st-digit-card.is-current .st-digit-gauge-fill {
+  stroke: #c4b5fd;
+}
+
+/* Selected Barrier Digit: Rounded Purple Box around whole column */
+.st-digit-card.selected-barrier {
+  border-color: #7c3aed;
+  background-color: rgba(124, 58, 237, 0.12);
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.25);
 }
 
 .st-digit-pct {
@@ -652,26 +719,7 @@ body.dashboard-body {
   font-weight: 600;
   color: var(--st-text-dim);
   font-variant-numeric: tabular-nums;
-}
-
-/* Active Highlight (Current Last Digit) */
-.st-digit-card.is-current .st-digit-circle {
-  background-color: rgba(124, 58, 237, 0.3);
-  border-color: #a78bfa;
-  box-shadow: 0 0 14px rgba(167, 139, 250, 0.6);
-  color: #ffffff;
-}
-
-/* Selected Barrier Digit */
-.st-digit-card.selected-barrier {
-  border-color: var(--st-neon-purple);
-  background-color: rgba(124, 58, 237, 0.15);
-  box-shadow: 0 0 16px rgba(124, 58, 237, 0.3);
-}
-
-.st-digit-card.selected-barrier .st-digit-circle {
-  border-color: var(--st-neon-purple);
-  color: #ffffff;
+  margin-top: 4px;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -683,6 +731,8 @@ body.dashboard-body {
   background-color: var(--st-panel);
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .st-trade-card {

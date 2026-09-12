@@ -178,17 +178,50 @@
   /* ══════════════════════════════════════════════════════
      5. HIGH-FIDELITY LIVE NEON CANVAS CHART
   ══════════════════════════════════════════════════════ */
+  function drawRoundedRect(targetCtx, x, y, w, h, r) {
+    targetCtx.beginPath();
+    targetCtx.moveTo(x + r, y);
+    targetCtx.lineTo(x + w - r, y);
+    targetCtx.quadraticCurveTo(x + w, y, x + w, y + r);
+    targetCtx.lineTo(x + w, y + h - r);
+    targetCtx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    targetCtx.lineTo(x + r, y + h);
+    targetCtx.quadraticCurveTo(x, y + h, x, y + h - r);
+    targetCtx.lineTo(x, y + r);
+    targetCtx.quadraticCurveTo(x, y, x + r, y);
+    targetCtx.closePath();
+  }
+
   function resizeCanvas() {
     if (!canvas || !canvas.parentElement) return;
     const rect = canvas.parentElement.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-    if (ctx) ctx.scale(dpr, dpr);
+    if (ctx) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+    }
     renderChart();
   }
 
   window.addEventListener('resize', resizeCanvas);
+
+  function updateXAxisTimestamps() {
+    const xAxisEl = document.getElementById('chartXAxis');
+    if (!xAxisEl) return;
+    const now = Date.now();
+    const count = 9;
+    const stepSec = 11;
+    let html = '';
+    for (let i = count - 1; i >= 0; i--) {
+      const t = new Date(now - i * stepSec * 1000);
+      const mm = String(t.getMinutes()).padStart(2, '0');
+      const ss = String(t.getSeconds()).padStart(2, '0');
+      html += `<span class="st-x-time">${mm}:${ss}</span>`;
+    }
+    xAxisEl.innerHTML = html;
+  }
 
   function renderChart() {
     if (!canvas || !ctx || chartTicks.length < 2) return;
@@ -199,117 +232,162 @@
     ctx.clearRect(0, 0, w, h);
 
     // Padding
-    const padTop = 30;
-    const padBottom = 40;
+    const padTop = 32;
+    const padBottom = 35;
     const padRight = 85;
-    const padLeft = 10;
+    const padLeft = 15;
     const drawW = w - padLeft - padRight;
     const drawH = h - padTop - padBottom;
 
-    const minP = Math.min(...chartTicks) - 0.5;
-    const maxP = Math.max(...chartTicks) + 0.5;
+    const rawMin = Math.min(...chartTicks);
+    const rawMax = Math.max(...chartTicks);
+    const rawRange = Math.max(0.2, rawMax - rawMin);
+    const margin = rawRange * 0.22;
+    const minP = rawMin - margin;
+    const maxP = rawMax + margin;
     const range = Math.max(0.1, maxP - minP);
 
     // Update Y-axis coordinate numbers in DOM
     const yMaxEl = document.getElementById('yLevelMax');
     const yMidHighEl = document.getElementById('yLevelMidHigh');
-    const yCurrentEl = document.getElementById('yLevelCurrent');
     const yMidLowEl = document.getElementById('yLevelMidLow');
     const yMinEl = document.getElementById('yLevelMin');
     const currP = chartTicks[chartTicks.length - 1];
 
-    if (yMaxEl) yMaxEl.textContent = maxP.toFixed(2);
-    if (yMidHighEl) yMidHighEl.textContent = (minP + range * 0.75).toFixed(2);
-    if (yCurrentEl) yCurrentEl.textContent = currP.toFixed(2);
-    if (yMidLowEl) yMidLowEl.textContent = (minP + range * 0.25).toFixed(2);
-    if (yMinEl) yMinEl.textContent = minP.toFixed(2);
+    if (yMaxEl) yMaxEl.textContent = (minP + range * 0.92).toFixed(2);
+    if (yMidHighEl) yMidHighEl.textContent = (minP + range * 0.65).toFixed(2);
+    if (yMidLowEl) yMidLowEl.textContent = (minP + range * 0.35).toFixed(2);
+    if (yMinEl) yMinEl.textContent = (minP + range * 0.08).toFixed(2);
 
-    // Draw grid lines
+    // 1. Draw subtle horizontal grid lines
+    ctx.save();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
     ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = padTop + (drawH / 4) * i;
+    [0.08, 0.35, 0.65, 0.92].forEach(ratio => {
+      const gy = padTop + drawH - ratio * drawH;
       ctx.beginPath();
-      ctx.moveTo(padLeft, y);
-      ctx.lineTo(w - padRight, y);
+      ctx.moveTo(padLeft, gy);
+      ctx.lineTo(w - 20, gy);
       ctx.stroke();
-    }
+    });
+    ctx.restore();
 
-    // Points mapping
+    // 2. Map coordinates
     const points = chartTicks.map((p, i) => {
       const x = padLeft + (i / (chartTicks.length - 1)) * drawW;
       const y = padTop + drawH - ((p - minP) / range) * drawH;
       return { x, y };
     });
 
-    // 1. Draw glowing gradient area fill under the line
+    // 3. Smooth Bezier path
+    function buildSmoothPath(targetCtx) {
+      targetCtx.beginPath();
+      targetCtx.moveTo(points[0].x, points[0].y);
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i === 0 ? 0 : i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        targetCtx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+      }
+    }
+
+    // 4. Fill glowing gradient under line
     const grad = ctx.createLinearGradient(0, padTop, 0, padTop + drawH);
     grad.addColorStop(0, 'rgba(0, 240, 144, 0.28)');
-    grad.addColorStop(0.7, 'rgba(0, 240, 144, 0.04)');
+    grad.addColorStop(0.65, 'rgba(0, 240, 144, 0.04)');
     grad.addColorStop(1, 'rgba(0, 240, 144, 0)');
 
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      const xc = (points[i].x + points[i - 1].x) / 2;
-      const yc = (points[i].y + points[i - 1].y) / 2;
-      ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, xc, yc);
-    }
+    ctx.save();
+    buildSmoothPath(ctx);
     const lastPt = points[points.length - 1];
-    ctx.lineTo(lastPt.x, lastPt.y);
     ctx.lineTo(lastPt.x, padTop + drawH);
     ctx.lineTo(points[0].x, padTop + drawH);
     ctx.closePath();
     ctx.fillStyle = grad;
     ctx.fill();
+    ctx.restore();
 
-    // 2. Draw neon glowing line
+    // 5. Draw neon glowing green line
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      const xc = (points[i].x + points[i - 1].x) / 2;
-      const yc = (points[i].y + points[i - 1].y) / 2;
-      ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, xc, yc);
-    }
-    ctx.lineTo(lastPt.x, lastPt.y);
+    buildSmoothPath(ctx);
     ctx.strokeStyle = '#00f090';
     ctx.lineWidth = 2.4;
     ctx.shadowColor = '#00f090';
     ctx.shadowBlur = 10;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.stroke();
     ctx.restore();
 
-    // 3. Draw dashed price target line to right axis
+    // 6. Draw horizontal dashed line across the entire chart width
+    const currY = lastPt.y;
     ctx.save();
     ctx.setLineDash([4, 4]);
     ctx.strokeStyle = 'rgba(0, 240, 144, 0.55)';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(lastPt.x, lastPt.y);
-    ctx.lineTo(w - padRight, lastPt.y);
+    ctx.moveTo(padLeft, currY);
+    ctx.lineTo(w - padRight + 12, currY);
     ctx.stroke();
     ctx.restore();
 
-    // 4. Pulsing head dot
-    ctx.beginPath();
-    ctx.arc(lastPt.x, lastPt.y, 4.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    // 7. Draw solid neon green price pill badge [ 730.03 ]
+    const badgeText = currP.toFixed(2);
+    ctx.save();
+    ctx.font = 'bold 11px Inter, sans-serif';
+    const badgeMetrics = ctx.measureText(badgeText);
+    const badgeW = Math.max(54, badgeMetrics.width + 12);
+    const badgeH = 18;
+    const badgeX = w - padRight + 12;
+    const badgeY = currY - badgeH / 2;
+
+    drawRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 4);
+    ctx.fillStyle = '#00f090';
+    ctx.shadowColor = 'rgba(0, 240, 144, 0.5)';
+    ctx.shadowBlur = 8;
     ctx.fill();
+
+    ctx.fillStyle = '#0a0d14';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, badgeX + badgeW / 2, currY + 0.5);
+    ctx.restore();
+
+    // 8. Pulsing head dot on the line
+    ctx.save();
     ctx.beginPath();
     ctx.arc(lastPt.x, lastPt.y, 9, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 240, 144, 0.4)';
+    ctx.fillStyle = 'rgba(0, 240, 144, 0.35)';
     ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(lastPt.x, lastPt.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#00f090';
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.restore();
+
+    // 9. Update rolling X-axis timestamps
+    updateXAxisTimestamps();
   }
 
   /* ══════════════════════════════════════════════════════
-     6. LIVE PRICE TICK & DIGITS STREAM
+     6. DERIV LIVE WEBSOCKET & 1S TICK ENGINE
   ══════════════════════════════════════════════════════ */
-  function tickEngine() {
+  let derivWs = null;
+  let derivSubscribedSymbol = null;
+  let lastDerivTickTime = 0;
+
+  function onNewTickReceived(nextP) {
     const m = MARKETS[currentMarketIdx];
-    const old = currentPrices[currentMarketIdx];
-    const delta = (Math.random() - 0.49) * m.base * m.vol;
-    const nextP = parseFloat((old + delta).toFixed(2));
     currentPrices[currentMarketIdx] = nextP;
 
     // Track High and Low
@@ -343,7 +421,69 @@
     stepOpenPositions(nextP, lastDigit);
   }
 
+  function initDerivFeed() {
+    const symbolMap = {
+      'v100': '1HZ100V',
+      'v75':  '1HZ75V',
+      'v50':  '1HZ50V',
+      'v25':  '1HZ25V',
+      'v10':  '1HZ10V'
+    };
+
+    const targetSymbol = symbolMap[MARKETS[currentMarketIdx].id] || '1HZ100V';
+
+    try {
+      if (derivWs && derivWs.readyState === WebSocket.OPEN) {
+        if (derivSubscribedSymbol !== targetSymbol) {
+          derivWs.send(JSON.stringify({ forget_all: 'ticks' }));
+          derivWs.send(JSON.stringify({ ticks: targetSymbol, subscribe: 1 }));
+          derivSubscribedSymbol = targetSymbol;
+        }
+        return;
+      }
+
+      derivWs = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+
+      derivWs.onopen = () => {
+        derivWs.send(JSON.stringify({ ticks: targetSymbol, subscribe: 1 }));
+        derivSubscribedSymbol = targetSymbol;
+      };
+
+      derivWs.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.msg_type === 'tick' && data.tick) {
+            lastDerivTickTime = Date.now();
+            onNewTickReceived(parseFloat(Number(data.tick.quote).toFixed(2)));
+          }
+        } catch (_) {}
+      };
+
+      derivWs.onerror = () => {};
+      derivWs.onclose = () => {
+        derivWs = null;
+      };
+    } catch (_) {}
+  }
+
+  // Authentic 1s Deriv Stochastic Engine (continuous fallback)
+  function tickEngine() {
+    // If Deriv WebSocket is streaming recent ticks (< 1.5s old), let WS drive
+    if (Date.now() - lastDerivTickTime < 1500) {
+      return;
+    }
+
+    const m = MARKETS[currentMarketIdx];
+    const old = currentPrices[currentMarketIdx];
+    const meanReversion = (m.base - old) * 0.015;
+    const randomWalk = (Math.random() - 0.495) * (m.base * m.vol);
+    const nextP = parseFloat(Math.max(1, old + randomWalk + meanReversion).toFixed(2));
+
+    onNewTickReceived(nextP);
+  }
+
   setInterval(tickEngine, 1000);
+  initDerivFeed();
 
   /* ══════════════════════════════════════════════════════
      7. LIVE LAST DIGITS ANALYSIS BAR
@@ -351,20 +491,39 @@
   function renderDigitsBar(activeDigit) {
     if (!digitsGridEl) return;
 
-    // Calculate percentage frequency for digits 0 - 9
+    // Calculate percentage frequency for digits 0 - 9 over lastDigitsHistory
     const counts = Array(10).fill(0);
-    lastDigitsHistory.forEach(d => counts[d]++);
+    lastDigitsHistory.forEach(d => {
+      if (d >= 0 && d <= 9) counts[d]++;
+    });
     const total = Math.max(1, lastDigitsHistory.length);
+
+    const circumference = 2 * Math.PI * 16; // ~100.53
 
     let html = '';
     for (let i = 0; i <= 9; i++) {
       const pct = Math.round((counts[i] / total) * 100);
       const isCurr = (i === activeDigit) ? 'is-current' : '';
       const isSelected = (i === selectedBarrier) ? 'selected-barrier' : '';
+      const offset = circumference - (circumference * pct) / 100;
 
       html += `
         <div class="st-digit-card ${isCurr} ${isSelected}" data-digit="${i}" title="Set barrier to ${i}">
-          <div class="st-digit-circle">${i}</div>
+          <div class="st-digit-indicator">${isCurr ? '&#9660;' : ''}</div>
+          <div class="st-digit-gauge-wrap">
+            <svg class="st-digit-gauge-svg" viewBox="0 0 38 38">
+              <circle class="st-digit-gauge-track" cx="19" cy="19" r="16" />
+              <circle
+                class="st-digit-gauge-fill"
+                cx="19"
+                cy="19"
+                r="16"
+                stroke-dasharray="${circumference.toFixed(2)}"
+                stroke-dashoffset="${offset.toFixed(2)}"
+              />
+            </svg>
+            <span class="st-digit-num-center">${i}</span>
+          </div>
           <span class="st-digit-pct">${pct}%</span>
         </div>
       `;
@@ -414,6 +573,7 @@
         for (let i = 0; i < 50; i++) {
           chartTicks.push(parseFloat((m.base + (Math.random() - 0.49) * 2).toFixed(2)));
         }
+        initDerivFeed();
         renderChart();
         updateExecutionControls();
       });
