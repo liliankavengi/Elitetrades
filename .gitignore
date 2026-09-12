@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Secrets — NEVER commit these
+.env
+functions/.env
+functions/.env.local
+functions/.env.*.local
+serviceAccountKey.json
+.firebaserc
+
+# Local build artifacts
+.firebase/
+.cache/
+dist/
+
+# OS files
+Thumbs.db
+.DS_Store

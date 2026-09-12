@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <title>Trading Dashboard — EliteTrades</title>
+  <meta name="description" content="Trade Volatility Index markets from your EliteTrades dashboard. Deposit, withdraw, and place Rise & Fall contracts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body class="dashboard-body">
+
+  <!-- ══════════════════════════════════════
+       DASHBOARD HEADER
+  ══════════════════════════════════════ -->
+  <header class="dashboard-header" role="banner">
+    <div class="container">
+      <div class="dash-nav">
+        <!-- Logo -->
+        <a href="index.html" class="logo" aria-label="EliteTrades Home">
+          <div class="logo-icon">ET</div>
+          <span class="logo-text">Elite<span>Trades</span></span>
+        </a>
+
+        <!-- Balance -->
+        <div class="balance-display" aria-live="polite" aria-label="Account balance">
+          <div>
+            <div class="balance-label">Balance</div>
+            <div class="balance-amount" id="dashBalance">$0.00</div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="dash-actions">
+          <button class="btn btn-primary btn-sm" data-open-deposit id="depositHeaderBtn">
+            + Deposit
+          </button>
+          <button class="btn btn-ghost btn-sm" data-open-withdraw id="withdrawHeaderBtn">
+            Withdraw
+          </button>
+          <button class="btn btn-ghost btn-sm" data-signout title="Sign out" aria-label="Sign out">
+            Sign Out
+          </button>
+        </div>
+
+        <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Menu -->
+  <nav class="mobile-menu" id="mobileMenu" aria-label="Mobile navigation">
+    <div style="padding:12px 0;border-bottom:1px solid var(--border);font-size:0.88rem;color:var(--text-muted);" id="userGreeting">Hello, Trader</div>
+    <button class="btn btn-primary btn-full" data-open-deposit style="margin-top:8px;">+ Deposit Funds</button>
+    <button class="btn btn-ghost btn-full" data-open-withdraw style="margin-top:8px;">Withdraw</button>
+    <button class="btn btn-ghost btn-full" data-signout style="margin-top:8px;">Sign Out</button>
+  </nav>
+
+  <main id="main-content">
+    <div class="container">
+
+      <!-- ═══════════════════════════════
+           STATS BAR
+      ═══════════════════════════════ -->
+      <div class="dash-stats" style="margin-top:24px;" aria-label="Account statistics">
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Balance</div>
+          <div class="dash-stat-value" id="statBalance">$0.00</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Trades Won</div>
+          <div class="dash-stat-value positive" id="statWins">0</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Trades Lost</div>
+          <div class="dash-stat-value negative" id="statLosses">0</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Net Profit</div>
+          <div class="dash-stat-value" id="statProfit">$0.00</div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════
+           MAIN DASHBOARD GRID
+      ═══════════════════════════════ -->
+      <div class="dashboard-grid">
+
+        <!-- LEFT: TRADING PANEL -->
+        <aside aria-label="Trading panel">
+          <div class="trade-panel">
+            <div class="trade-panel-header">
+              <span class="trade-panel-title">Place a Trade</span>
+              <span class="badge badge-positive" style="font-size:0.72rem;">
+                <span class="dot-pulse"></span> Live
+              </span>
+            </div>
+
+            <!-- Market Selector -->
+            <div class="market-selector">
+              <label for="marketSelect">Market</label>
+              <select class="market-select-input" id="marketSelect" aria-label="Select a market">
+                <!-- Populated by JS -->
+              </select>
+            </div>
+
+            <!-- Live Price -->
+            <div class="live-price-display" aria-live="polite" aria-label="Live market price">
+              <div>
+                <div class="live-price-number" id="livePrice">8,842.50</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">Live price</div>
+              </div>
+              <div class="live-price-meta">
+                <span class="live-price-change up" id="priceChange">+0.021%</span>
+                <span class="live-price-label">24h change</span>
+              </div>
+            </div>
+
+            <!-- Duration Selector -->
+            <div class="duration-selector">
+              <label>Contract Duration</label>
+              <div class="duration-pills">
+                <button class="duration-pill" data-duration="15s">15s</button>
+                <button class="duration-pill" data-duration="30s">30s</button>
+                <button class="duration-pill active" data-duration="1m">1 min</button>
+                <button class="duration-pill" data-duration="2m">2 min</button>
+                <button class="duration-pill" data-duration="5m">5 min</button>
+              </div>
+            </div>
+
+            <!-- Stake Input -->
+            <div class="stake-section">
+              <div class="stake-label-row">
+                <span class="stake-label">Your Stake</span>
+                <span class="balance-available">Available: <span id="stakeBalanceLabel">$0.00</span></span>
+              </div>
+              <div class="stake-input-row">
+                <div class="stake-input-wrap">
+                  <span class="stake-currency">$</span>
+                  <input
+                    class="stake-input"
+                    type="number"
+                    id="stakeInput"
+                    value="1.00"
+                    min="0.35"
+                    step="0.01"
+                    placeholder="0.00"
+                    aria-label="Stake amount in USD"
+                  />
+                </div>
+              </div>
+              <div class="stake-quick-btns">
+                <button class="stake-quick" data-value="1">+$1</button>
+                <button class="stake-quick" data-value="5">+$5</button>
+                <button class="stake-quick" data-value="10">+$10</button>
+                <button class="stake-quick" data-value="50">+$50</button>
+                <button class="stake-quick" data-value="all">Max</button>
+              </div>
+            </div>
+
+            <!-- Payout Preview -->
+            <div class="payout-preview" aria-label="Payout breakdown">
+              <div class="payout-preview-item">
+                <span class="payout-preview-label">Stake</span>
+                <span class="payout-preview-value" id="previewStake">$1.00</span>
+              </div>
+              <div class="payout-divider"></div>
+              <div class="payout-preview-item">
+                <span class="payout-preview-label">If You Win</span>
+                <span class="payout-preview-value win-amount" id="potentialWin">+$0.35</span>
+              </div>
+              <div class="payout-divider"></div>
+              <div class="payout-preview-item">
+                <span class="payout-preview-label">Total Return</span>
+                <span class="payout-preview-value" id="potentialReturn">$1.35</span>
+              </div>
+              <div class="payout-divider"></div>
+              <div class="payout-preview-item">
+                <span class="payout-preview-label">If You Lose</span>
+                <span class="payout-preview-value loss-amount" id="potentialLoss">−$1.00</span>
+              </div>
+            </div>
+
+            <!-- Trade Buttons -->
+            <div class="trade-buttons">
+              <button class="btn-rise" id="riseBtn" aria-label="Place Rise contract">
+                ▲ Rise
+                <span>Market goes up</span>
+              </button>
+              <button class="btn-fall" id="fallBtn" aria-label="Place Fall contract">
+                ▼ Fall
+                <span>Market goes down</span>
+              </button>
+            </div>
+
+            <!-- Payout rule note -->
+            <div style="padding:12px 20px;border-top:1px solid var(--border);text-align:center;">
+              <p style="font-size:0.75rem;color:var(--text-muted);line-height:1.6;">
+                Payout: <strong style="color:var(--white);">35%</strong> of stake on a win.
+                $1 stake wins <strong style="color:var(--positive);">+$0.35</strong> profit.
+                Max loss is your stake.
+                <a href="how-it-works.html" style="color:var(--accent);">Full rules</a>
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        <!-- RIGHT: HISTORY PANEL -->
+        <section aria-label="Transaction history">
+          <div class="history-panel">
+            <div class="history-panel-header">
+              <h2 style="font-size:1rem;font-weight:700;color:var(--white);">Transaction History</h2>
+            </div>
+
+            <!-- Tabs -->
+            <div class="history-tabs" role="tablist">
+              <button class="history-tab active" data-tab="all" role="tab" aria-selected="true">All</button>
+              <button class="history-tab" data-tab="trades" role="tab" aria-selected="false">Trades</button>
+              <button class="history-tab" data-tab="deposits" role="tab" aria-selected="false">Deposits</button>
+              <button class="history-tab" data-tab="withdrawals" role="tab" aria-selected="false">Withdrawals</button>
+            </div>
+
+            <!-- List -->
+            <div class="history-list" id="historyList" role="list" aria-live="polite">
+              <div class="history-empty">
+                <div class="empty-icon">📋</div>
+                <p>No transactions yet.<br>Deposit funds to begin trading.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /dashboard-grid -->
+    </div><!-- /container -->
+  </main>
+
+  <!-- ══════════════════════════════════════
+       TRADE RESULT OVERLAY
+  ══════════════════════════════════════ -->
+  <div class="trade-result-overlay" id="tradeResult" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <div class="trade-result-card">
+      <span class="result-icon" id="resultIcon">🏆</span>
+      <h2 class="result-title win" id="resultTitle">You Won!</h2>
+      <p class="result-subtitle" id="resultSub">Your prediction was correct.</p>
+
+      <div class="result-amount-row">
+        <div class="result-amount-label" id="resultAmountLabel">Profit Credited</div>
+        <div class="result-amount-value win" id="resultAmount">+$0.35</div>
+      </div>
+
+      <p class="result-new-balance" id="resultNewBalance">New balance: <strong>$0.00</strong></p>
+
+      <button class="btn btn-primary btn-full btn-lg" id="closeResult">Continue Trading</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       DEPOSIT MODAL
+  ══════════════════════════════════════ -->
+  <div class="modal-overlay" id="depositModal" role="dialog" aria-modal="true" aria-labelledby="depositModalTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="depositModalTitle">Deposit Funds</h3>
+        <button class="modal-close" data-close-modal aria-label="Close deposit modal">&#10005;</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Payment Method (M-Pesa only) -->
+        <div style="margin-bottom:4px;">
+          <p style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;">Payment Method</p>
+          <div class="method-pill active" style="display:inline-flex;cursor:default;">
+            <span class="method-name">M-Pesa</span>
+          </div>
+        </div>
+
+        <!-- Error display -->
+        <div id="depositError" style="display:none;background-color:var(--negative-bg);border:1px solid var(--negative);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:0.84rem;color:#fca5a5;font-weight:500;" role="alert"></div>
+
+        <!-- M-PESA FORM -->
+        <div id="panel-mpesa">
+          <form id="mpesaDepositForm" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="mpesaPhone">M-Pesa Phone Number</label>
+              <input
+                class="form-control"
+                type="tel"
+                id="mpesaPhone"
+                placeholder="07xx xxx xxx"
+                autocomplete="tel"
+              />
+              <p class="form-hint">Safaricom M-Pesa only: 07xx or 011x (e.g. 0712345678, 0110123456)</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="mpesaAmount">Amount (KES)</label>
+              <div class="stake-input-wrap">
+                <span class="stake-currency" style="font-size:0.75rem;width:36px;">KES</span>
+                <input
+                  class="stake-input"
+                  type="number"
+                  id="mpesaAmount"
+                  placeholder="500"
+                  min="10"
+                  step="1"
+                  style="padding-left:44px;"
+                />
+              </div>
+              <p class="form-hint" id="mpesaConversion">Equivalent: ~$0.00 USD (rate: 1 USD = 130 KES)</p>
+              <div class="amount-quick">
+                <button type="button" class="amount-btn" data-mpesa-amount="100">100</button>
+                <button type="button" class="amount-btn" data-mpesa-amount="500">500</button>
+                <button type="button" class="amount-btn" data-mpesa-amount="1000">1,000</button>
+                <button type="button" class="amount-btn" data-mpesa-amount="2500">2,500</button>
+                <button type="button" class="amount-btn" data-mpesa-amount="5000">5,000</button>
+              </div>
+            </div>
+
+            <div style="background-color:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:11px 14px;margin-bottom:16px;">
+              <p style="font-size:0.82rem;color:var(--text-muted);">
+                You will receive an STK prompt on your phone. Enter your M-Pesa PIN to confirm. Your balance updates automatically after payment.
+              </p>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full btn-lg" id="mpesaDepositBtn">
+              Send M-Pesa Prompt
+            </button>
+          </form>
+
+          <!-- Waiting state -->
+          <div id="mpesaWaiting" style="display:none;text-align:center;padding:24px 0;">
+            <div style="font-size:2.5rem;margin-bottom:12px;">&#128241;</div>
+            <p style="font-weight:700;color:var(--white);margin-bottom:6px;">Check Your Phone</p>
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:20px;">An M-Pesa prompt has been sent. Enter your PIN to complete the payment.</p>
+            <div style="display:flex;gap:6px;justify-content:center;margin-bottom:20px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 1.2s ease-in-out infinite;"></span>
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 1.2s ease-in-out 0.4s infinite;"></span>
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 1.2s ease-in-out 0.8s infinite;"></span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="mpesaCancelWait">Cancel</button>
+          </div>
+        </div>
+
+          <div style="background-color:var(--negative-bg);border:1px solid var(--negative);border-radius:var(--radius-md);padding:11px 14px;margin-bottom:16px;">
+            <p style="font-size:0.82rem;color:var(--text-body);">
+              After sending, contact support with your TXN hash for manual credit. Only send TRC20 USDT — other networks will be lost.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       WITHDRAW MODAL
+  ══════════════════════════════════════ -->
+  <div class="modal-overlay" id="withdrawModal" role="dialog" aria-modal="true" aria-labelledby="withdrawModalTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="withdrawModalTitle">Withdraw Funds</h3>
+        <button class="modal-close" data-close-modal aria-label="Close withdraw modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="withdrawForm" novalidate>
+
+          <!-- Method -->
+          <div style="margin-bottom:20px;">
+            <p style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;">Withdrawal Method</p>
+            <div class="method-pill active" style="display:inline-flex;cursor:default;">
+              <span class="method-name">M-Pesa</span>
+            </div>
+          </div>
+
+          <!-- Account -->
+          <div class="form-group">
+            <label class="form-label" id="withdrawAccountLabel" for="withdrawAccount">M-Pesa Number</label>
+            <input
+              class="form-control"
+              type="text"
+              id="withdrawAccount"
+              name="withdrawAccount"
+              placeholder="07xx xxx xxx"
+              autocomplete="tel"
+              required
+            />
+            <p class="form-hint" id="withdrawAccountHint">
+              Safaricom M-Pesa only: 07xxxxxxxxx or 011xxxxxxx
+            </p>
+            <p class="form-hint" id="withdrawAccountError" style="color:var(--negative);display:none;margin-top:4px;font-weight:600;"></p>
+          </div>
+
+          <!-- Amount -->
+          <div class="form-group">
+            <label class="form-label" for="withdrawAmount">
+              Amount (USD)
+              <span style="float:right;font-weight:400;font-size:0.78rem;color:var(--text-muted);">
+                Balance: <span id="modalBalance" style="color:var(--positive);font-weight:700;">$0.00</span>
+              </span>
+            </label>
+            <div class="stake-input-wrap">
+              <span class="stake-currency">$</span>
+              <input
+                class="stake-input"
+                type="number"
+                id="withdrawAmount"
+                name="withdrawAmount"
+                placeholder="10.00"
+                min="1"
+                step="0.01"
+                style="padding-left:28px;"
+                required
+              />
+            </div>
+            <p class="form-hint">Minimum withdrawal: $1.00 · Processed within 24 hours.</p>
+            <div class="amount-quick">
+              <button type="button" class="amount-btn" data-target="withdrawAmount" data-amount="10">$10</button>
+              <button type="button" class="amount-btn" data-target="withdrawAmount" data-amount="25">$25</button>
+              <button type="button" class="amount-btn" data-target="withdrawAmount" data-amount="50">$50</button>
+              <button type="button" class="amount-btn" data-target="withdrawAmount" data-amount="100">$100</button>
+            </div>
+          </div>
+
+          <div style="background-color:var(--negative-bg);border:1px solid var(--negative);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:20px;">
+            <p style="font-size:0.82rem;color:var(--text-body);">
+              Withdrawals are processed within 24 hours and sent to your registered account.
+            </p>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="withdrawSubmit">
+            Confirm Withdrawal
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TOAST CONTAINER
+  ══════════════════════════════════════ -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+  <!-- EliteTrades -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

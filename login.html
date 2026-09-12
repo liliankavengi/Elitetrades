@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <title>Sign In — EliteTrades</title>
+  <meta name="description" content="Sign in to your EliteTrades account and access live Volatility Index markets." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="auth-page">
+
+  <header id="header" role="banner">
+    <div class="container">
+      <nav class="nav-inner" aria-label="Main navigation">
+        <a href="index.html" class="logo" aria-label="EliteTrades Home">
+          <div class="logo-icon">ET</div>
+          <span class="logo-text">Elite<span>Trades</span></span>
+        </a>
+        <div class="nav-actions">
+          <a href="register.html" class="btn btn-primary btn-sm">Create Account</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main class="auth-main" id="main-content">
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <div class="logo" style="justify-content:center;margin-bottom:20px;">
+          <div class="logo-icon">ET</div>
+          <span class="logo-text">Elite<span>Trades</span></span>
+        </div>
+        <h2>Welcome back</h2>
+        <p>Sign in to access your trading account</p>
+      </div>
+
+      <!-- Error message -->
+      <div id="auth-error" style="
+        display:none;
+        background-color:var(--negative-bg);
+        border:1px solid var(--negative);
+        border-radius:var(--radius-md);
+        padding:12px 16px;
+        margin-bottom:20px;
+        font-size:0.88rem;
+        color:#fca5a5;
+        font-weight:500;
+      " role="alert"></div>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="login-email">Email Address</label>
+          <input
+            class="form-control"
+            type="email"
+            id="login-email"
+            name="email"
+            placeholder="you@example.com"
+            autocomplete="email"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="login-password">
+            Password
+            <a href="#" style="float:right;font-weight:400;color:var(--accent);font-size:0.82rem;" id="forgot-link">Forgot password?</a>
+          </label>
+          <div class="input-wrap">
+            <input
+              class="form-control"
+              type="password"
+              id="login-password"
+              name="password"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              class="input-icon-btn"
+              data-toggle-password="login-password"
+              aria-label="Toggle password visibility"
+            >Show</button>
+          </div>
+        </div>
+
+        <div class="checkbox-group">
+          <input type="checkbox" id="remember-me" name="remember" />
+          <label for="remember-me">Keep me signed in for 30 days</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full btn-lg" id="signin-submit">
+          Sign In
+        </button>
+      </form>
+
+      <div class="form-divider"><span>New to EliteTrades?</span></div>
+
+      <a href="register.html" class="btn btn-ghost btn-full" id="goto-register">
+        Create a Free Account
+      </a>
+
+      <p class="auth-footer" style="margin-top:20px;">
+        Need help? <a href="#">Contact Support</a>
+      </p>
+    </div>
+  </main>
+
+  <footer style="text-align:center;padding:20px;border-top:1px solid var(--border);background:var(--surface);">
+    <p class="footer-legal" style="font-size:0.78rem;color:var(--text-muted);max-width:600px;margin:0 auto;">
+      <strong>Risk Warning:</strong> Trading involves risk. Only trade with money you can afford to lose.
+    </p>
+    <p style="margin-top:8px;font-size:0.78rem;color:var(--text-muted);">© 2025 EliteTrades</p>
+  </footer>
+
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <!-- EliteTrades -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

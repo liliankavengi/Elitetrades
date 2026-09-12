@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';" />
+  <title>How It Works & Payout Rules — EliteTrades</title>
+  <meta name="description" content="Understand how EliteTrades Rise & Fall contracts work, payout percentages, contract durations, and withdrawal rules." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="hiw-page">
+
+  <!-- Header -->
+  <header id="header" role="banner">
+    <div class="container">
+      <nav class="nav-inner" aria-label="Main navigation">
+        <a href="index.html" class="logo" aria-label="EliteTrades Home">
+          <div class="logo-icon">ET</div>
+          <span class="logo-text">Elite<span>Trades</span></span>
+        </a>
+        <ul class="nav-links" role="list">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="index.html#markets-section">Markets</a></li>
+          <li><a href="how-it-works.html" class="active">How It Works</a></li>
+        </ul>
+        <div class="nav-actions">
+          <a href="login.html" class="btn btn-ghost btn-sm">Sign In</a>
+          <a href="register.html" class="btn btn-primary btn-sm">Get Started</a>
+        </div>
+        <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <nav class="mobile-menu" id="mobileMenu" aria-label="Mobile navigation">
+    <a href="index.html">Home</a>
+    <a href="index.html#markets-section">Markets</a>
+    <a href="how-it-works.html" class="active">How It Works</a>
+    <a href="login.html" style="color:var(--accent);">Sign In</a>
+    <a href="register.html"><span class="btn btn-primary btn-sm" style="width:100%;justify-content:center;">Get Started</span></a>
+  </nav>
+
+  <main id="main-content">
+
+    <!-- Page Hero -->
+    <div class="hiw-hero" style="background-color:var(--surface);border-bottom:1px solid var(--border);">
+      <div class="container">
+        <span class="badge badge-accent" style="margin-bottom:16px;">Transparent &amp; Clear</span>
+        <h1>How EliteTrades Works</h1>
+        <p style="max-width:580px;margin:16px auto 0;font-size:1.05rem;">
+          No hidden fees. No complicated rules. Here is everything you need to know about our contracts,
+          payouts, deposits, and withdrawals — plainly explained.
+        </p>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:48px;padding-bottom:80px;">
+
+      <!-- SECTION 1: Contract Types -->
+      <div class="hiw-section fade-in-up">
+        <div class="hiw-section-header">
+          <h3>📈 Contract Types</h3>
+        </div>
+        <div class="hiw-section-body">
+          <div class="info-grid" style="margin-bottom:24px;">
+            <div class="info-card" style="border-color:var(--positive);">
+              <h4 style="color:var(--positive);">Rise Contract</h4>
+              <p>You predict that the market price will be <strong style="color:var(--white);">higher</strong> when the contract expires compared to when you entered it. If correct, you win the fixed payout percentage of your stake.</p>
+            </div>
+            <div class="info-card" style="border-color:var(--negative);">
+              <h4 style="color:var(--negative);">Fall Contract</h4>
+              <p>You predict that the market price will be <strong style="color:var(--white);">lower</strong> when the contract expires. If correct, you win the fixed payout. If wrong, you lose your stake.</p>
+            </div>
+          </div>
+          <p style="font-size:0.9rem;color:var(--text-muted);">
+            Both contract types are fixed-odds. Your maximum loss is limited to your stake. You cannot lose more than you put in on a single contract.
+          </p>
+        </div>
+      </div>
+
+      <!-- SECTION 2: Payout Table -->
+      <div class="hiw-section fade-in-up">
+        <div class="hiw-section-header">
+          <h3>💰 Payout Percentages by Market</h3>
+        </div>
+        <div class="hiw-section-body" style="padding:0;">
+          <table class="payout-table" aria-label="Payout percentages by market">
+            <thead>
+              <tr>
+                <th>Market</th>
+                <th>Symbol</th>
+                <th>Rise Payout</th>
+                <th>Fall Payout</th>
+                <th>Min Stake</th>
+                <th>Max Stake</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="highlight-row">
+                <td>Volatility 100 Index</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V100</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>Volatility 75 Index</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V75</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>Volatility 50 Index</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V50</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>Volatility 25 Index</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V25</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>Volatility 10 Index</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V10</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>V100 (1s tick)</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V100(1s)</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>V75 (1s tick)</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V75(1s)</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>V50 (1s tick)</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V50(1s)</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>V25 (1s tick)</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V25(1s)</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+              <tr>
+                <td>V10 (1s tick)</td>
+                <td><span class="badge badge-accent" style="font-size:0.72rem;">V10(1s)</span></td>
+                <td>35% of stake</td>
+                <td>35% of stake</td>
+                <td>$0.35</td>
+                <td>$5,000</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="padding:16px 24px;font-size:0.82rem;color:var(--text-muted);border-top:1px solid var(--border);">
+            Payout percentages are the return on your stake. A 92% payout on a $100 stake means you receive $192 total ($100 stake + $92 profit) if you win.
+          </p>
+        </div>
+      </div>
+
+      <!-- SECTION 3: Contract Durations -->
+      <div class="hiw-section fade-in-up">
+        <div class="hiw-section-header">
+          <h3>⏱️ Contract Durations</h3>
+        </div>
+        <div class="hiw-section-body">
+          <table class="payout-table" aria-label="Contract duration options">
+            <thead>
+              <tr>
+                <th>Duration Type</th>
+                <th>Available Options</th>
+                <th>Best For</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Ticks</td>
+                <td>1, 2, 3, 4, 5 ticks</td>
+                <td>Ultra short-term traders on 1s tick markets</td>
+              </tr>
+              <tr>
+                <td>Seconds</td>
+                <td>15s, 30s, 45s, 60s</td>
+                <td>Fast scalping on standard markets</td>
+              </tr>
+              <tr>
+                <td>Minutes</td>
+                <td>1m, 2m, 3m, 5m, 10m, 15m, 30m</td>
+                <td>Short-term intraday trades</td>
+              </tr>
+              <tr>
+                <td>Hours</td>
+                <td>1h, 2h, 4h, 6h, 12h</td>
+                <td>Swing trades based on session analysis</td>
+              </tr>
+              <tr>
+                <td>End of Day</td>
+                <td>Close of current trading day</td>
+                <td>Daily directional bias trades</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SECTION 4: Deposits & Withdrawals -->
+      <div class="hiw-section fade-in-up">
+        <div class="hiw-section-header">
+          <h3>🏦 Deposits &amp; Withdrawals</h3>
+        </div>
+        <div class="hiw-section-body">
+          <div class="info-grid">
+            <div class="info-card">
+              <h4>💳 Deposit Methods</h4>
+              <p>M-Pesa (instant), Airtel Money, bank card (Visa / Mastercard), and EFT bank transfer. All deposits are credited instantly.</p>
+            </div>
+            <div class="info-card">
+              <h4>🏧 Minimum Deposit</h4>
+              <p>$5 USD (approximately KES 750). There is no maximum deposit limit. Funds are available for trading immediately upon deposit confirmation.</p>
+            </div>
+            <div class="info-card">
+              <h4>⚡ Withdrawal Speed</h4>
+              <p>Withdrawal requests are processed within <strong style="color:var(--white);">24 hours</strong>. M-Pesa withdrawals typically reflect within minutes of approval.</p>
+            </div>
+            <div class="info-card">
+              <h4>🔄 Withdrawal Rules</h4>
+              <p>No minimum withdrawal amount. Withdrawals are returned to the original deposit method. ID verification may be required for larger withdrawals.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 5: Winning & Losing -->
+      <div class="hiw-section fade-in-up">
+        <div class="hiw-section-header">
+          <h3>🎯 How Winning &amp; Losing Works</h3>
+        </div>
+        <div class="hiw-section-body">
+          <div class="info-grid" style="margin-bottom:20px;">
+            <div class="info-card" style="border-color:var(--positive);">
+              <h4 style="color:var(--positive);">If Your Prediction Is Correct</h4>
+              <p>Your stake is returned to you plus 35% profit. Example: $50 stake → you receive <strong style="color:var(--white);">$67.50</strong> ($50 stake + $17.50 profit). Scale is linear — $1 stake → +$0.35 profit.</p>
+            </div>
+            <div class="info-card" style="border-color:var(--negative);">
+              <h4 style="color:var(--negative);">If Your Prediction Is Wrong</h4>
+              <p>You lose your stake for that contract. Your <strong style="color:var(--white);">maximum loss is your stake</strong> — nothing more. No margin calls. No debt.</p>
+            </div>
+          </div>
+          <div class="info-card" style="background-color:var(--accent-muted);border-color:var(--accent);">
+            <h4 style="color:var(--accent);">Equal Entry Price</h4>
+            <p>If the market price at contract expiry equals the entry price exactly (a tie), your stake is refunded in full. You neither win nor lose.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align:center;padding:48px 0 0;">
+        <h2 style="margin-bottom:12px;">Ready to place your first trade?</h2>
+        <p style="margin-bottom:28px;">Open a free account and start trading in under 2 minutes.</p>
+        <div class="cta-buttons">
+          <a href="register.html" class="btn btn-primary btn-lg" id="hiw-cta">Create Free Account →</a>
+          <a href="login.html" class="btn btn-ghost btn-lg">Sign In</a>
+        </div>
+      </div>
+
+    </div><!-- /container -->
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer" role="contentinfo">
+    <div class="container">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:32px 0;flex-wrap:wrap;gap:20px;border-bottom:1px solid var(--border);">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">ET</div>
+          <span class="logo-text">Elite<span>Trades</span></span>
+        </a>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <a href="index.html" style="font-size:0.88rem;color:var(--text-body);">Home</a>
+          <a href="index.html#markets-section" style="font-size:0.88rem;color:var(--text-body);">Markets</a>
+          <a href="#" style="font-size:0.88rem;color:var(--text-body);">Terms</a>
+          <a href="#" style="font-size:0.88rem;color:var(--text-body);">Privacy</a>
+          <a href="#" style="font-size:0.88rem;color:var(--text-body);">Contact</a>
+        </div>
+      </div>
+      <div style="padding:24px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+        <p class="footer-legal">
+          <strong>Risk Warning:</strong> Trading in volatility indices involves significant risk of loss and may not be suitable for all investors. 
+          You should not invest money that you cannot afford to lose. Past performance does not guarantee future results.
+        </p>
+        <span class="footer-copy">© 2025 EliteTrades</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
