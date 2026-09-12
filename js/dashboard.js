@@ -619,8 +619,8 @@
     if (!phone || !/^(\+?254[17]\d{8}|0[17]\d{8})$/.test(phone.replace(/\s/g, ''))) {
       showDepositError('Enter a valid M-Pesa number (07xx, 01xx, +2547xx or +2541xx).'); return;
     }
-    if (!kes || kes < 10) {
-      showDepositError('Minimum deposit is KES 10.'); return;
+    if (!kes || kes < 130) {
+      showDepositError('Minimum deposit is $1.00 (KES 130).'); return;
     }
 
     btn.textContent = 'Sending prompt…';

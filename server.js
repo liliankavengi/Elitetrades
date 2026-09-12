@@ -74,8 +74,8 @@ app.post('/api/initiate-deposit', async (req, res) => {
     if (!uid) {
       return res.status(401).json({ success: false, error: 'User must be signed in.' });
     }
-    if (!amount_kes || amount_kes < 10) {
-      return res.status(400).json({ success: false, error: 'Minimum deposit is KES 10.' });
+    if (!amount_kes || amount_kes < 130) {
+      return res.status(400).json({ success: false, error: 'Minimum deposit is $1.00 (KES 130).' });
     }
 
     const cleanPhone = (phone || '').replace(/\s/g, '');
