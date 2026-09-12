@@ -1,11 +1,24 @@
 /* ============================================================
-   ELITETRADES — Main Stylesheet
+   ELITETRADES - Main Stylesheet
    Trust-first palette | Flat solid colors | No gradients
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* ── CSS Custom Properties ─────────────────────────────── */
+/* Lucide Icons */
+.lucide {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-block;
+  vertical-align: middle;
+  stroke-width: 2px;
+}
+.lucide-sm { width: 1rem; height: 1rem; }
+.lucide-md { width: 1.5rem; height: 1.5rem; }
+.lucide-lg { width: 2rem; height: 2rem; }
+.lucide-xl { width: 2.75rem; height: 2.75rem; }
+
+/* CSS Custom Properties */
 :root {
   --bg:           #0D1B2A;
   --surface:      #132235;

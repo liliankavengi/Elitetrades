@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="X-Frame-Options" content="DENY" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*;" />
   <meta name="referrer" content="no-referrer" />
-  <title>EliteTrades — Trade Volatility Index Markets with Confidence</title>
-  <meta name="description" content="EliteTrades gives traders real-time access to Volatility Index markets. Rise & Fall contracts from 15 seconds. Instant deposits and fast withdrawals." />
+  <title>EliteTrades | Trade Volatility Index Markets with Confidence</title>
+  <meta name="description" content="EliteTrades gives traders real-time access to Volatility Index markets. Rise &amp; Fall contracts from 15 seconds. Instant deposits and fast withdrawals." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -88,13 +88,13 @@
             </h1>
 
             <p class="hero-sub">
-              Access real-time Volatility Index markets — Rise &amp; Fall contracts starting
+              Access real-time Volatility Index markets. Rise &amp; Fall contracts starting
               from as little as 15 seconds. No spreads. No surprises. Just your trade.
             </p>
 
             <div class="hero-ctas">
               <a href="register.html" class="btn btn-primary btn-lg" id="hero-cta-primary">
-                Start Trading →
+                Start Trading &rarr;
               </a>
               <a href="login.html" class="btn btn-ghost btn-lg" id="hero-cta-signin">
                 Sign In
@@ -103,15 +103,15 @@
 
             <div class="hero-trust">
               <div class="trust-item">
-                <span>🛡️</span>
+                <i data-lucide="shield-check" class="lucide-sm" style="color:var(--accent);"></i>
                 <span>Real live prices</span>
               </div>
               <div class="trust-item">
-                <span>⚡</span>
+                <i data-lucide="zap" class="lucide-sm" style="color:var(--accent);"></i>
                 <span>Contracts from 15 sec</span>
               </div>
               <div class="trust-item">
-                <span>💳</span>
+                <i data-lucide="smartphone" class="lucide-sm" style="color:var(--accent);"></i>
                 <span>Fast withdrawals</span>
               </div>
             </div>
@@ -253,44 +253,44 @@
         <div class="section-header">
           <span class="badge badge-accent">Why EliteTrades</span>
           <h2 id="features-title">Built for serious traders</h2>
-          <p>Everything you need to trade volatility markets confidently — from live prices to instant payouts.</p>
+          <p>Everything you need to trade volatility markets confidently: from live prices to instant payouts.</p>
         </div>
 
         <div class="features-grid">
           <div class="feature-card fade-in-up" id="feat-prices">
-            <div class="feature-icon">📡</div>
+            <div class="feature-icon"><i data-lucide="activity"></i></div>
             <h3>Real-Time Live Prices</h3>
             <p>Stream live prices from Volatility Index markets with zero delay. What you see is exactly what you trade.</p>
           </div>
 
           <div class="feature-card fade-in-up" id="feat-trading">
-            <div class="feature-icon">⚡</div>
+            <div class="feature-icon"><i data-lucide="zap"></i></div>
             <h3>One-Tap Trading</h3>
             <p>Place Rise or Fall contracts in a single tap. Set your stake, pick your contract duration, and go.</p>
           </div>
 
           <div class="feature-card fade-in-up" id="feat-payouts">
-            <div class="feature-icon">💰</div>
+            <div class="feature-icon"><i data-lucide="percent"></i></div>
             <h3>35% Payout</h3>
             <p>Competitive fixed payouts on all markets. Know your exact return before entering any trade.</p>
           </div>
 
           <div class="feature-card fade-in-up" id="feat-deposits">
-            <div class="feature-icon">🏦</div>
+            <div class="feature-icon"><i data-lucide="wallet"></i></div>
             <h3>Fast Deposits &amp; Withdrawals</h3>
             <p>Fund your account instantly via M-Pesa, bank transfer, or card. Withdrawals processed within 24 hours.</p>
           </div>
 
           <div class="feature-card fade-in-up" id="feat-security">
-            <div class="feature-icon">🛡️</div>
+            <div class="feature-icon"><i data-lucide="shield"></i></div>
             <h3>Bank-Level Security</h3>
             <p>256-bit SSL encryption, 2FA authentication, and segregated client funds keep your account and money safe.</p>
           </div>
 
           <div class="feature-card fade-in-up" id="feat-contracts">
-            <div class="feature-icon">⏱️</div>
+            <div class="feature-icon"><i data-lucide="clock"></i></div>
             <h3>Contracts from 15 Seconds</h3>
-            <p>Trade short-term or long-term. Contracts range from 15 seconds to hours — trade on your own schedule.</p>
+            <p>Trade short-term or long-term. Contracts range from 15 seconds to hours: trade on your own schedule.</p>
           </div>
         </div>
       </div>
@@ -369,7 +369,7 @@
         <div class="section-header">
           <span class="badge badge-accent">Available Markets</span>
           <h2 id="markets-title">Trade any Volatility Index</h2>
-          <p>10 volatility markets — standard and 1-second tick variants — available 24/7, 365 days a year.</p>
+          <p>10 volatility markets (standard and 1-second tick variants) available 24/7, 365 days a year.</p>
         </div>
 
         <div class="markets-table" role="table" aria-label="Live market prices">
@@ -463,13 +463,17 @@
         <div class="section-header">
           <span class="badge badge-accent">Trader Reviews</span>
           <h2 id="reviews-title">Trusted by traders worldwide</h2>
-          <p>Real feedback from real EliteTrades members — not actors, not scripts.</p>
+          <p>Real feedback from real EliteTrades members: not actors, not scripts.</p>
         </div>
 
         <div class="testimonials-grid">
           <article class="testimonial-card fade-in-up">
-            <div class="stars" aria-label="5 out of 5 stars">
-              <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+            <div class="stars" aria-label="5 out of 5 stars" style="display:flex;gap:4px;color:#f59e0b;margin-bottom:12px;">
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
             </div>
             <p class="testimonial-text">"I've traded on several platforms and EliteTrades is by far the most transparent. The prices are live, the payouts are as advertised, and withdrawals hit fast. Exactly what I needed."</p>
             <div class="testimonial-author">
@@ -482,8 +486,12 @@
           </article>
 
           <article class="testimonial-card fade-in-up">
-            <div class="stars" aria-label="5 out of 5 stars">
-              <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+            <div class="stars" aria-label="5 out of 5 stars" style="display:flex;gap:4px;color:#f59e0b;margin-bottom:12px;">
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
             </div>
             <p class="testimonial-text">"The V75 market is my go-to. Contracts settle fast, the interface is clean, and customer support actually responds. I've been trading here for 8 months without issues."</p>
             <div class="testimonial-author">
@@ -496,8 +504,12 @@
           </article>
 
           <article class="testimonial-card fade-in-up">
-            <div class="stars" aria-label="4 out of 5 stars">
-              <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star" style="color:var(--text-muted)">★</span>
+            <div class="stars" aria-label="4 out of 5 stars" style="display:flex;gap:4px;color:#f59e0b;margin-bottom:12px;">
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="fill:currentColor;"></i>
+              <i data-lucide="star" class="lucide-sm" style="color:var(--border-light);"></i>
             </div>
             <p class="testimonial-text">"Depositing is smooth and withdrawals come through quickly. The payout structure is clear and fair. I especially appreciate that everything is explained plainly upfront."</p>
             <div class="testimonial-author">
@@ -592,6 +604,7 @@
     </div>
   </footer>
 
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

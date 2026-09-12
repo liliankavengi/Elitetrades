@@ -1,5 +1,5 @@
 /* ===========================================================
-   ELITETRADES — main.js
+   ELITETRADES - main.js
    Live ticker | Rotating headline | Price widget ticker | Scroll animations
    =========================================================== */
 
@@ -158,7 +158,7 @@
         const won = Math.random() > 0.35;
         return `
           <div class="ticker-item">
-            <span>🎉</span>
+            <i data-lucide="trending-up" class="lucide-sm" style="color:var(--positive);"></i>
             <span class="winner">${a.user}</span>
             <span>${won ? 'won' : 'placed'}</span>
             <span class="amount">${a.amount}</span>
@@ -222,13 +222,16 @@
     counters.forEach(c => obs.observe(c));
   }
 
-  /* ── 8. Password Visibility Toggle ─────────────────────── */
+  /* -- 8. Password Visibility Toggle ----------------------- */
   document.querySelectorAll('[data-toggle-password]').forEach(btn => {
+    btn.innerHTML = '<i data-lucide="eye" class="lucide-sm"></i>';
     btn.addEventListener('click', () => {
-      const target  = document.getElementById(btn.dataset.togglePassword);
-      const isPass  = target.type === 'password';
-      target.type   = isPass ? 'text' : 'password';
-      btn.textContent = isPass ? '🙈' : '👁️';
+      const target = document.getElementById(btn.dataset.togglePassword);
+      if (!target) return;
+      const isPass = target.type === 'password';
+      target.type = isPass ? 'text' : 'password';
+      btn.innerHTML = isPass ? '<i data-lucide="eye-off" class="lucide-sm"></i>' : '<i data-lucide="eye" class="lucide-sm"></i>';
+      if (window.lucide) lucide.createIcons();
     });
   });
 
@@ -275,5 +278,10 @@
       pill.classList.add('active');
     });
   });
+
+  // Initialise Lucide icons
+  if (window.lucide) {
+    lucide.createIcons();
+  }
 
 })();

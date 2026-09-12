@@ -1,5 +1,5 @@
 /* ===========================================================
-   ELITETRADES — dashboard.css
+   ELITETRADES - dashboard.css
    Additional styles for the trading dashboard
    =========================================================== */
 
@@ -621,10 +621,10 @@
   margin-right: 12px;
 }
 
-.history-icon.win      { background-color: var(--positive-bg); }
-.history-icon.lose     { background-color: var(--negative-bg); }
-.history-icon.deposit  { background-color: var(--accent-muted); }
-.history-icon.withdraw { background-color: #1a1a2e; border: 1px solid var(--border); }
+.history-icon.win      { background-color: var(--positive-bg); color: #34d399; }
+.history-icon.lose     { background-color: var(--negative-bg); color: #f87171; }
+.history-icon.deposit  { background-color: rgba(26, 86, 219, 0.2); color: #60a5fa; }
+.history-icon.withdraw { background-color: rgba(217, 119, 6, 0.2); color: #fbbf24; border: 1px solid rgba(217, 119, 6, 0.3); }
 
 .history-info { flex: 1; }
 

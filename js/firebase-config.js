@@ -1,11 +1,11 @@
 /* ===========================================================
-   ELITETRADES — firebase-config.js
+   ELITETRADES - firebase-config.js
    Replace the placeholder values below with your actual
    Firebase project credentials from:
    Firebase Console → Project Settings → Your Apps → Web App
    =========================================================== */
 
-// ⚠️  PASTE YOUR FIREBASE CONFIG HERE  ⚠️
+// Note: Firebase configuration
 const firebaseConfig = {
   apiKey:            "AIzaSyBdWZE4W5NF7JoPJHlCW2zml2RIEQKLKyo",
   authDomain:        "elitetrades-693d1.firebaseapp.com",
@@ -16,7 +16,7 @@ const firebaseConfig = {
   measurementId:     "G-4TS7PN00ZQ"
 };
 
-// ⚠️  PASTE YOUR PAYPAL CLIENT ID HERE  ⚠️
+// PayPal Client ID (if enabled)
 // From: https://developer.paypal.com → My Apps → your app → Client ID
 const PAYPAL_CLIENT_ID = "PASTE_YOUR_PAYPAL_CLIENT_ID_HERE";
 

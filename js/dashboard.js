@@ -1,5 +1,5 @@
 /* ===========================================================
-   ELITETRADES — dashboard.js
+   ELITETRADES - dashboard.js
    Wallet | Deposit | Withdraw | Trading Engine (35% payout)
    =========================================================== */
 
@@ -28,7 +28,7 @@
      FIRESTORE STATE MANAGEMENT
   ══════════════════════════════════════════════════════ */
 
-  // In-memory state — populated from Firestore after auth
+  // In-memory state: populated from Firestore after auth
   let state = {
     user:         { name: 'Trader', email: '' },
     balance:      0,
@@ -244,11 +244,18 @@
 
   function showToast(msg, type = 'info') {
     if (!toastContainer) return;
-    const icons = { success: '✅', error: '❌', info: 'ℹ️', win: '🎉', lose: '😔' };
+    const icons = {
+      success: '<i data-lucide="check-circle-2" class="lucide-sm" style="color:var(--positive);"></i>',
+      error:   '<i data-lucide="alert-circle" class="lucide-sm" style="color:var(--negative);"></i>',
+      info:    '<i data-lucide="info" class="lucide-sm" style="color:var(--accent);"></i>',
+      win:     '<i data-lucide="award" class="lucide-sm" style="color:var(--positive);"></i>',
+      lose:    '<i data-lucide="trending-down" class="lucide-sm" style="color:var(--negative);"></i>'
+    };
     const toast = document.createElement('div');
     toast.className = `toast toast-${type === 'win' || type === 'success' ? 'success' : type === 'lose' || type === 'error' ? 'error' : 'info'}`;
-    toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-text">${msg}</span>`;
+    toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span class="toast-text">${msg}</span>`;
     toastContainer.appendChild(toast);
+    if (window.lucide) lucide.createIcons();
     setTimeout(() => toast.remove(), 4000);
   }
 
@@ -277,9 +284,10 @@
     if (txns.length === 0) {
       historyList.innerHTML = `
         <div class="history-empty">
-          <div class="empty-icon">📋</div>
+          <div class="empty-icon"><i data-lucide="clipboard-list" class="lucide-lg" style="color:var(--text-muted);"></i></div>
           <p>No transactions yet.<br>Make a deposit to start trading.</p>
         </div>`;
+      if (window.lucide) lucide.createIcons();
       return;
     }
 
@@ -287,9 +295,9 @@
       if (t.type === 'deposit') {
         return `
           <div class="history-item">
-            <div class="history-icon deposit">💳</div>
+            <div class="history-icon deposit"><i data-lucide="arrow-down-left" class="lucide-sm"></i></div>
             <div class="history-info">
-              <h4>Deposit — ${t.method}</h4>
+              <h4>Deposit - ${t.method}</h4>
               <span>${timeAgo(t.ts)}</span>
             </div>
             <div class="history-amount positive">+${fmt(t.amount)}</div>
@@ -299,9 +307,9 @@
       if (t.type === 'withdraw') {
         return `
           <div class="history-item">
-            <div class="history-icon withdraw">🏧</div>
+            <div class="history-icon withdraw"><i data-lucide="arrow-up-right" class="lucide-sm"></i></div>
             <div class="history-info">
-              <h4>Withdrawal — ${t.method}</h4>
+              <h4>Withdrawal - ${t.method}</h4>
               <span>${timeAgo(t.ts)} · ${t.status === 'pending' ? '<span style="color:var(--warning)">Pending</span>' : 'Completed'}</span>
             </div>
             <div class="history-amount negative">−${fmt(t.amount)}</div>
@@ -312,9 +320,11 @@
         const isWin = t.result === 'win';
         return `
           <div class="history-item">
-            <div class="history-icon ${isWin ? 'win' : 'lose'}">${isWin ? '🏆' : '📉'}</div>
+            <div class="history-icon ${isWin ? 'win' : 'lose'}">
+              <i data-lucide="${isWin ? 'trending-up' : 'trending-down'}" class="lucide-sm"></i>
+            </div>
             <div class="history-info">
-              <h4>${t.direction} — ${t.market} · ${t.duration}</h4>
+              <h4>${t.direction} - ${t.market} (${t.duration})</h4>
               <span>${timeAgo(t.ts)} · Stake: ${fmt(t.stake)}</span>
             </div>
             <div class="history-amount ${isWin ? 'positive' : 'negative'}">
@@ -325,6 +335,8 @@
 
       return '';
     }).join('');
+
+    if (window.lucide) lucide.createIcons();
   }
 
   // Tab switching
@@ -368,7 +380,7 @@
     const duration = currentDuration;
 
     // Show "waiting" for contract duration
-    showToast(`${direction} contract on ${market.symbol} — waiting ${duration}…`, 'info');
+    showToast(`${direction} contract on ${market.symbol} (${duration}) started`, 'info');
 
     // Duration map → ms
     const durMs = { '15s': 3000, '30s': 5000, '1m': 7000, '2m': 9000, '5m': 12000 };
@@ -428,18 +440,20 @@
     const balanceEl2 = resultOverlay.querySelector('#resultNewBalance');
 
     if (won) {
-      if (iconEl)   iconEl.textContent   = '🏆';
+      if (iconEl)   { iconEl.innerHTML = '<i data-lucide="award" class="lucide-xl" style="color:var(--positive);"></i>'; }
       if (titleEl)  { titleEl.textContent = 'You Won!'; titleEl.className = 'result-title win'; }
       if (subEl)    subEl.textContent    = 'Your prediction was correct.';
       if (labelEl)  labelEl.textContent  = 'Profit Credited';
       if (amountEl) { amountEl.textContent = '+' + fmt(profit); amountEl.className = 'result-amount-value win'; }
     } else {
-      if (iconEl)   iconEl.textContent   = '📉';
+      if (iconEl)   { iconEl.innerHTML = '<i data-lucide="trending-down" class="lucide-xl" style="color:var(--negative);"></i>'; }
       if (titleEl)  { titleEl.textContent = 'Better Luck Next Time'; titleEl.className = 'result-title lose'; }
       if (subEl)    subEl.textContent    = 'The market moved against you.';
       if (labelEl)  labelEl.textContent  = 'Stake Lost';
       if (amountEl) { amountEl.textContent = '−' + fmt(stake); amountEl.className = 'result-amount-value lose'; }
     }
+
+    if (window.lucide) lucide.createIcons();
 
     if (balanceEl2) balanceEl2.innerHTML = `New balance: <strong>${fmt(newBalance)}</strong>`;
 
@@ -516,7 +530,7 @@
     if (errorEl) { errorEl.textContent   = ''; errorEl.style.display = 'none'; }
   }
 
-  // Method pill selection — deposit and withdraw
+  // Method pill selection: deposit and withdraw
   document.querySelectorAll('.method-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       const grid = pill.closest('.method-grid');
@@ -532,7 +546,7 @@
   });
 
   /* ════════════════════════════════════════════════════════════
-     11b. DEPOSIT METHOD PANELS — show/hide based on selection
+     11b. DEPOSIT METHOD PANELS: show/hide based on selection
   ════════════════════════════════════════════════════════════ */
   const KES_RATE = 130;
 
@@ -604,7 +618,7 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
-     11c. M-PESA DEPOSIT — PayHero STK Push via Cloud Function
+     11c. M-PESA DEPOSIT: PayHero STK Push via Cloud Function
   ═══════════════════════════════════════════════════════════ */
   let mpesaUnsubscribe = null; // Firestore listener cleanup
 
@@ -704,7 +718,7 @@
   });
 
   /* ═══════════════════════════════════════════════════════════
-     11d. PAYPAL DEPOSIT — PayPal JS SDK + Cloud Function capture
+     11d. PAYPAL DEPOSIT: PayPal JS SDK + Cloud Function capture
   ═══════════════════════════════════════════════════════════ */
   let paypalButtonsRendered = false;
 
@@ -789,7 +803,7 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
-     11e. WITHDRAWAL — PayHero B2C via Cloud Function
+     11e. WITHDRAWAL: PayHero B2C via Cloud Function
   ═══════════════════════════════════════════════════════════ */
   const withdrawForm = document.getElementById('withdrawForm');
   withdrawForm?.addEventListener('submit', async (e) => {
@@ -857,7 +871,7 @@
         showToast(result.data.message || `Withdrawal of ${fmt(amount)} submitted.`, 'success');
 
       } else {
-        // PayPal / USDT — manual processing (no B2C API yet)
+        // PayPal / USDT: manual processing (no B2C API yet)
         state.balance = parseFloat((state.balance - amount).toFixed(2));
         state.transactions.push({ type: 'withdrawal', amount: -amount, method, account, status: 'processing', ts: Date.now() });
         await saveState(state);
@@ -896,7 +910,7 @@
   const greetEl = document.getElementById('userGreeting');
   if (greetEl) {
     const u = state.user || {};
-    greetEl.textContent = 'Hello, ' + (u.name || 'Trader') + ' 👋';
+    greetEl.textContent = 'Hello, ' + (u.name || 'Trader');
   }
 
   /* ══════════════════════════════════════════════════════
@@ -909,6 +923,11 @@
 
   // Initial price display
   if (livePriceEl) livePriceEl.textContent = fmtPrice(currentPrices[0]);
+
+  // Initialise Lucide icons
+  if (window.lucide) {
+    lucide.createIcons();
+  }
 
   // Show onboarding toast if balance is 0
   if (state.balance === 0) {

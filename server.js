@@ -1,5 +1,5 @@
 /* ===========================================================
-   ELITETRADES — Express Server for Render / Cloud Hosting
+   ELITETRADES - Express Server for Render / Cloud Hosting
    Serves Frontend + M-Pesa (PayHero) Backend API & Webhooks
    =========================================================== */
 

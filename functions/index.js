@@ -1,5 +1,5 @@
 /* ===========================================================
-   ELITETRADES — Firebase Cloud Functions
+   ELITETRADES - Firebase Cloud Functions
    Payment backend: M-Pesa only via PayHero API
    =========================================================== */
 
@@ -40,8 +40,8 @@ exports.initiateDeposit = functions.https.onCall(async (data, context) => {
   const uid = context.auth.uid;
 
   /* Validate */
-  if (!amount_kes || amount_kes < 10) {
-    throw new functions.https.HttpsError('invalid-argument', 'Minimum M-Pesa deposit is KES 10.');
+  if (!amount_kes || amount_kes < 130) {
+    throw new functions.https.HttpsError('invalid-argument', 'Minimum M-Pesa deposit is $1.00 (KES 130).');
   }
   const cleanPhone = (phone || '').replace(/\s/g, '');
   if (!/^(\+?254[17]\d{8}|0[17]\d{8})$/.test(cleanPhone)) {
@@ -55,7 +55,7 @@ exports.initiateDeposit = functions.https.onCall(async (data, context) => {
 
   const extRef = `ET-DEP-${uid.slice(0, 8)}-${Date.now()}`;
 
-  /* Store pending deposit — frontend listens to this doc */
+  /* Store pending deposit: frontend listens to this doc */
   await db.collection('pending_deposits').doc(extRef).set({
     uid,
     amount_kes,
@@ -112,7 +112,7 @@ exports.initiateDeposit = functions.https.onCall(async (data, context) => {
 
 
 /* ───────────────────────────────────────────────────────────
-   2. PAYHERO CALLBACK  (Webhook — PayHero calls this after payment)
+   2. PAYHERO CALLBACK  (Webhook: PayHero calls this after payment)
 ─────────────────────────────────────────────────────────── */
 exports.payheroCallback = functions.https.onRequest(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');

@@ -1,5 +1,5 @@
 /* ===========================================================
-   ELITETRADES — auth.js
+   ELITETRADES - auth.js
    Handles Register + Login using Firebase Authentication.
    Saves user profile to Firestore on registration.
    =========================================================== */
